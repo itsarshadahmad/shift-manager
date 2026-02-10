@@ -1,0 +1,831 @@
+# Employee Shift Scheduler SaaS - MVP Development Prompt
+
+## Project Overview
+
+You are helping build an Employee Shift Scheduler SaaS product with integrated time-off management. This is a web application (MVP focuses on web only, mobile apps come later) designed for small to medium businesses (10-500 employees) in shift-based industries like retail, hospitality, healthcare clinics, security services, and restaurants.
+
+### Core Problem We're Solving
+- Managers spend hours manually creating schedules each week
+- Last-minute callouts and shift swaps create chaos
+- Time-off requests get lost or forgotten
+- Scheduling conflicts lead to understaffing or overstaffing
+- Payroll integration is manual and error-prone
+
+### Value Proposition
+"Create fair, conflict-free schedules in minutes, not hours - with automatic payroll integration"
+
+## Target Users
+
+**Primary Users (Managers/Schedulers)**
+- Small business owners who do their own scheduling
+- Operations managers at multi-location businesses
+- Shift supervisors with scheduling responsibilities
+- Pain points: Time consumption, fairness complaints, last-minute changes
+- Primary device: Desktop/laptop computer (though responsive design for tablets)
+
+**Secondary Users (Employees)**
+- Hourly workers who need to know their schedule
+- Part-time staff with variable availability
+- Employees who need to request time off or swap shifts
+- Pain points: Last-minute schedule changes, inflexible time-off process, unfair shift distribution
+- Primary device: Desktop/laptop or tablet (mobile-responsive web interface)
+
+## Product Vision
+
+### MVP Features (What we're building)
+1. **Schedule Management**
+   - Drag-and-drop weekly/monthly schedule builder
+   - Shift templates for recurring schedules
+   - Multi-location support
+   - Conflict detection (double-booking, insufficient rest periods)
+   - Responsive web interface for all screen sizes
+
+2. **Time-Off Management**
+   - Employee self-service time-off requests
+   - Manager approval workflow
+   - Balance tracking (vacation days, sick days, PTO)
+   - Blackout dates for busy periods
+   - Team availability calendar view
+
+3. **Communication**
+   - Email notifications for schedule changes
+   - In-app messaging for shift-related topics
+   - Shift swap requests (with manager approval)
+   - Broadcast announcements to teams
+
+4. **Basic Reporting**
+   - Hours worked per employee
+   - Labor cost projections
+   - Time-off usage tracking
+   - Schedule adherence reports
+
+5. **User Management**
+   - Multi-tenant organization setup
+   - Role-based access control (Owner, Manager, Employee)
+   - User invitation system
+   - Profile management
+
+### Future Features (Post-MVP)
+- Mobile applications (iOS and Android)
+- AI-powered auto-scheduling
+- Advanced payroll integrations
+- Clock-in/out with GPS
+- Advanced analytics and forecasting
+- Compliance automation
+
+## Technical Architecture
+
+### Tech Stack
+**Frontend (Web Application):**
+- Framework: Next.js 15 (App Router) with TypeScript
+- Styling: Tailwind CSS
+- UI Components: shadcn/ui
+- State Management: React Context API + hooks, TanStack Query for server state
+- Form Handling: React Hook Form with Zod validation
+- Date/Time: date-fns or Day.js
+- Drag-and-Drop: @dnd-kit/core
+- Charts/Reporting: Recharts or Chart.js
+
+**Backend (API Server):**
+- Runtime: Node.js (v20+)
+- Framework: Express.js
+- Language: TypeScript
+- ORM: Prisma (with PostgreSQL)
+- Authentication: JWT tokens with refresh token rotation
+- Validation: Zod (shared with frontend)
+- API Documentation: Swagger/OpenAPI (optional)
+
+**Database:**
+- PostgreSQL 15+
+- ORM: Prisma for type-safe database access
+- Migrations: Prisma Migrate
+- Multi-tenancy: Row-level security (every query filtered by organizationId)
+
+**Infrastructure:**
+- Frontend Hosting: Vercel (recommended) or AWS Amplify
+- Backend Hosting: AWS (ECS, EC2, or Elastic Beanstalk) or Railway/Render
+- Database: AWS RDS PostgreSQL or Supabase
+- File Storage: AWS S3 (for profile pictures, documents)
+- Email: SendGrid or AWS SES
+- Caching: Redis (optional for MVP, can add later)
+
+**Development Tools:**
+- Version Control: Git (GitHub/GitLab)
+- Package Manager: npm or pnpm
+- Code Quality: ESLint, Prettier
+- Testing: Jest (unit), Playwright (E2E)
+- CI/CD: GitHub Actions or GitLab CI
+
+### Project Structure
+
+**Frontend (Next.js 15):**
+```
+shift-scheduler-web/
+├── src/
+│   ├── app/                    # Next.js 15 App Router
+│   │   ├── (auth)/            # Auth routes (login, signup)
+│   │   ├── (dashboard)/       # Protected dashboard routes
+│   │   │   ├── schedule/
+│   │   │   ├── time-off/
+│   │   │   ├── employees/
+│   │   │   └── reports/
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components/            # React components
+│   │   ├── ui/               # shadcn/ui components
+│   │   ├── schedule/         # Schedule-specific components
+│   │   ├── time-off/
+│   │   └── layout/
+│   ├── lib/                   # Utilities, helpers
+│   │   ├── api.ts            # API client
+│   │   ├── auth.ts           # Auth helpers
+│   │   └── utils.ts
+│   ├── hooks/                 # Custom React hooks
+│   ├── types/                 # TypeScript types
+│   └── schemas/               # Zod schemas
+├── public/                    # Static assets
+├── prisma/                    # Prisma schema (if using for frontend queries)
+└── package.json
+```
+
+**Backend (Express.js):**
+```
+shift-scheduler-api/
+├── src/
+│   ├── controllers/           # Route handlers
+│   │   ├── auth.controller.ts
+│   │   ├── schedule.controller.ts
+│   │   ├── timeOff.controller.ts
+│   │   └── user.controller.ts
+│   ├── services/              # Business logic
+│   │   ├── auth.service.ts
+│   │   ├── schedule.service.ts
+│   │   ├── timeOff.service.ts
+│   │   └── notification.service.ts
+│   ├── middleware/            # Express middleware
+│   │   ├── auth.middleware.ts
+│   │   ├── validate.middleware.ts
+│   │   └── errorHandler.middleware.ts
+│   ├── routes/                # API routes
+│   │   ├── auth.routes.ts
+│   │   ├── schedule.routes.ts
+│   │   ├── timeOff.routes.ts
+│   │   └── user.routes.ts
+│   ├── utils/                 # Utilities
+│   │   ├── jwt.ts
+│   │   ├── email.ts
+│   │   └── validators.ts
+│   ├── types/                 # TypeScript types
+│   ├── config/                # Configuration
+│   │   └── database.ts
+│   └── server.ts              # Express app setup
+├── prisma/
+│   ├── schema.prisma          # Database schema
+│   ├── migrations/            # Migration files
+│   └── seed.ts                # Seed data
+├── tests/                     # Test files
+└── package.json
+```
+
+### Database Schema (Prisma Format)
+
+```prisma
+// Core models for MVP
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  planTier  String   @default("starter") // starter, professional, enterprise
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  locations        Location[]
+  users            User[]
+  shifts           Shift[]
+  timeOffRequests  TimeOffRequest[]
+  notifications    Notification[]
+  
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  organizationId String
+  email          String   @unique
+  password       String   // hashed
+  firstName      String
+  lastName       String
+  phone          String?
+  role           Role     @default(EMPLOYEE) // OWNER, MANAGER, EMPLOYEE
+  hourlyRate     Decimal? @db.Decimal(10, 2)
+  position       String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shifts            Shift[]
+  timeOffRequests   TimeOffRequest[]
+  availability      Availability[]
+  sentNotifications Notification[]
+  
+  @@index([organizationId])
+  @@index([email])
+  @@map("users")
+}
+
+model Location {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  address        String?
+  timezone       String   @default("America/New_York")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  shifts       Shift[]
+  
+  @@index([organizationId])
+  @@map("locations")
+}
+
+model Shift {
+  id             String      @id @default(cuid())
+  organizationId String
+  locationId     String
+  userId         String?
+  startTime      DateTime
+  endTime        DateTime
+  position       String?
+  notes          String?
+  status         ShiftStatus @default(SCHEDULED) // SCHEDULED, PUBLISHED, COMPLETED, CANCELLED
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@index([organizationId])
+  @@index([locationId])
+  @@index([userId])
+  @@index([startTime, endTime])
+  @@map("shifts")
+}
+
+model TimeOffRequest {
+  id             String          @id @default(cuid())
+  organizationId String
+  userId         String
+  startDate      DateTime
+  endDate        DateTime
+  type           TimeOffType     // VACATION, SICK, PERSONAL, UNPAID
+  status         RequestStatus   @default(PENDING) // PENDING, APPROVED, DENIED
+  reason         String?
+  reviewedBy     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@map("time_off_requests")
+}
+
+model Availability {
+  id          String  @id @default(cuid())
+  userId      String
+  dayOfWeek   Int     // 0 = Sunday, 6 = Saturday
+  startTime   String  // "09:00"
+  endTime     String  // "17:00"
+  isAvailable Boolean @default(true)
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@map("availability")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  orgId     String
+  userId    String
+  type      NotificationType // SCHEDULE_PUBLISHED, SHIFT_CHANGED, TIME_OFF_APPROVED, etc.
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+// Enums
+enum Role {
+  OWNER
+  MANAGER
+  EMPLOYEE
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  PUBLISHED
+  COMPLETED
+  CANCELLED
+}
+
+enum TimeOffType {
+  VACATION
+  SICK
+  PERSONAL
+  UNPAID
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+enum NotificationType {
+  SCHEDULE_PUBLISHED
+  SHIFT_CHANGED
+  SHIFT_ASSIGNED
+  TIME_OFF_APPROVED
+  TIME_OFF_DENIED
+  SHIFT_SWAP_REQUESTED
+  ANNOUNCEMENT
+}
+```
+
+### Key Technical Requirements
+- Multi-tenant architecture (one database, data isolated by organizationId)
+- Server-side rendering (SSR) with Next.js for better SEO and performance
+- Type safety across the entire stack (TypeScript + Prisma)
+- Responsive design (works on desktop, tablet, and mobile browsers)
+- Real-time updates when schedules change (can use polling for MVP, WebSockets later)
+- Secure authentication with HTTP-only cookies for tokens
+- WCAG 2.1 AA accessibility compliance
+- 99.9% uptime target
+- API response time <200ms for most operations
+- Optimistic UI updates for better UX
+- Comprehensive error handling and logging
+
+### API Design Principles
+- RESTful API design
+- Consistent response format (success/error structure)
+- Proper HTTP status codes
+- API versioning (e.g., /api/v1/)
+- Request/response validation using Zod
+- Pagination for list endpoints
+- Filtering and sorting support
+- Clear error messages
+
+### Security Requirements
+- Password hashing with bcrypt (minimum 10 rounds)
+- JWT tokens with short expiration (15 minutes)
+- Refresh tokens stored securely (HTTP-only cookies)
+- CORS configuration for production
+- Rate limiting on authentication endpoints
+- SQL injection protection (Prisma handles this)
+- XSS protection (React handles this, but validate on backend)
+- CSRF protection for state-changing operations
+- Environment variables for all secrets
+- Input validation on all endpoints
+
+## Business Model
+
+### Pricing Tiers
+- **Starter:** $2/employee/month (5-50 employees, 1 location)
+- **Professional:** $4/employee/month (10+ employees, unlimited locations)
+- **Enterprise:** Custom pricing (200+ employees, dedicated support)
+
+### Target Metrics
+- Trial-to-paid conversion: 25%
+- Monthly churn rate: <5%
+- Customer acquisition cost: $300-400
+- Average customer: 25 employees = $100 MRR
+
+## Competitive Landscape
+
+### Main Competitors
+- When I Work (strong mobile app, simple interface)
+- Deputy (good payroll integration, Australia-based)
+- 7shifts (restaurant-focused, POS integrations)
+- Homebase (free tier, targets very small businesses)
+
+### Our Differentiation
+- Superior UX/UI (competitors feel dated)
+- Faster schedule creation (better drag-and-drop)
+- Better conflict detection and warnings
+- More intuitive time-off management
+- Fair pricing for small businesses
+
+## MVP Development Objectives
+
+### Development Goals
+1. **Backend API Development**
+   - Set up Express.js server with TypeScript
+   - Implement Prisma ORM with PostgreSQL
+   - Create all necessary database models and migrations
+   - Build RESTful API endpoints for all core features
+   - Implement JWT authentication system
+   - Create middleware for authorization and validation
+   - Set up email notification service
+   - Write unit tests for critical business logic
+
+2. **Frontend Web Application**
+   - Set up Next.js 15 project with App Router
+   - Implement authentication flow (login, signup, password reset)
+   - Build drag-and-drop schedule builder interface
+   - Create time-off request and approval system
+   - Develop user management interface
+   - Implement responsive design for all screen sizes
+   - Build reporting dashboards
+   - Create notification center
+
+3. **Infrastructure & DevOps**
+   - Set up development, staging, and production environments
+   - Configure database with proper indexes and constraints
+   - Implement CI/CD pipeline for automated testing and deployment
+   - Set up error logging and monitoring
+   - Configure email service (SendGrid/AWS SES)
+   - Implement backup strategy for database
+
+4. **Documentation**
+   - API documentation (Swagger/Postman collection)
+   - Database schema documentation
+   - Setup and installation guide
+   - Environment variables documentation
+   - Deployment guide
+
+### Pre-Launch Marketing Goals
+1. Build waitlist of 200+ interested businesses
+2. Recruit 10-15 beta testing businesses
+3. Create SEO-optimized website and blog
+4. Develop brand identity and marketing materials
+5. Produce video demo and screenshots
+
+### Success Criteria for MVP
+- All core features are functional and bug-free
+- 10 beta customers actively using the product daily
+- Managers can create a weekly schedule in under 5 minutes
+- Zero critical security vulnerabilities
+- API response times under 200ms for 95% of requests
+- 3+ positive customer testimonials collected
+- Waitlist of 200+ emails
+- Product saves beta users at least 2 hours/week on scheduling
+
+### MVP Development Timeline (8-12 weeks)
+
+**Weeks 1-2: Foundation**
+- Project setup (both frontend and backend)
+- Database schema design and Prisma setup
+- Authentication system (backend + frontend)
+- Basic UI layout and navigation
+- User management (create, invite, manage users)
+
+**Weeks 3-4: Core Scheduling**
+- Shift CRUD operations (backend)
+- Schedule builder UI with drag-and-drop
+- Conflict detection algorithm
+- Location management
+- Template system for recurring schedules
+
+**Weeks 5-6: Time-Off Management**
+- Time-off request system (backend + frontend)
+- Approval workflow
+- Balance tracking
+- Calendar integration
+- Blackout dates management
+
+**Weeks 7-8: Communication & Reporting**
+- Notification system
+- Email notifications
+- In-app messaging
+- Basic reporting dashboards
+- Labor cost calculations
+
+**Weeks 9-10: Polish & Testing**
+- Bug fixes and refinements
+- Performance optimization
+- Security audit
+- Responsive design improvements
+- User acceptance testing with beta users
+
+**Weeks 11-12: Deployment & Beta Launch**
+- Production deployment
+- Beta user onboarding
+- Monitoring and logging setup
+- Documentation finalization
+- Feedback collection system
+
+## Design Principles
+
+### User Experience
+- **Speed:** Schedules should be created in <5 minutes for a week
+- **Clarity:** No confusing jargon, obvious what every button does
+- **Responsive:** Works seamlessly on desktop, tablet, and mobile browsers
+- **Accessibility:** Screen reader compatible, high contrast, keyboard navigation
+- **Forgiving:** Easy undo, confirmations for destructive actions
+- **Progressive Enhancement:** Core functionality works without JavaScript
+- **Feedback:** Loading states, success confirmations, clear error messages
+
+### Visual Design
+- Clean, modern, professional aesthetic
+- Calming color palette (avoid stress-inducing reds)
+- Generous white space
+- Calendar-centric interface
+- Clear visual hierarchy
+- Consistent component styling using shadcn/ui
+- Smooth transitions and animations (subtle, not distracting)
+
+### Development Principles
+- **Type Safety:** TypeScript everywhere, no `any` types
+- **DRY (Don't Repeat Yourself):** Reusable components and utilities
+- **Separation of Concerns:** Business logic in services, not controllers
+- **Error Handling:** Graceful degradation, user-friendly error messages
+- **Testing:** Write tests for critical paths
+- **Code Quality:** ESLint, Prettier, consistent code style
+- **Documentation:** Comment complex logic, maintain README files
+
+## User Workflows
+
+### Manager: Creating a Weekly Schedule
+1. Navigate to schedule view for specific location and week
+2. See template from previous week (or blank grid)
+3. Drag employees from sidebar onto shift slots OR use quick-add button
+4. System highlights conflicts in real-time (availability issues, double-booking, overtime warnings)
+5. Make adjustments to resolve conflicts
+6. Preview labor costs for the week in sidebar
+7. Click "Publish Schedule" button (sends email notifications to all employees)
+8. Confirmation modal shows who will be notified
+9. Success message appears, schedule is locked from employee edits
+
+### Employee: Requesting Time Off
+1. Log into web app, navigate to "Time Off" page
+2. Click "New Request" button
+3. Select date range using calendar picker
+4. Select type from dropdown (Vacation, Sick, Personal, Unpaid)
+5. Add optional note in text field explaining request
+6. Click "Submit Request" button
+7. See request appear in "Pending Requests" list
+8. Receive email notification when manager approves/denies
+9. See updated PTO balance on dashboard
+
+### Manager: Approving Time-Off Request
+1. Receive email notification of new request OR see badge on "Time Off" nav item
+2. Navigate to "Time Off" > "Pending Requests" tab
+3. Click on request to view details in modal
+4. View context: who else is off that day, current shift coverage, employee's PTO balance
+5. Click "Approve" or "Deny" button
+6. If denying, add required explanation in text field
+7. Click "Confirm" button
+8. If approved, system automatically blocks that employee from being scheduled
+9. Employee receives email notification immediately
+10. Request moves to "Approved" or "Denied" tab
+
+### Employee: Viewing Schedule
+1. Log into web app
+2. Dashboard shows current week's schedule by default
+3. Use week navigation arrows to view future schedules
+4. Click on any shift to view details (time, location, position, notes)
+5. See color-coded shifts (upcoming, in-progress, completed)
+6. Export schedule to calendar (download .ics file)
+7. Print schedule if needed
+
+### Manager: Handling Shift Swap
+1. Employee A requests to swap shift with Employee B
+2. Manager receives notification and email
+3. Navigate to "Shift Swaps" page
+4. View swap request with details of both shifts
+5. Verify Employee B has required skills/certifications
+6. Click "Approve Swap" or "Deny Swap"
+7. If approved, shifts are automatically updated in schedule
+8. Both employees receive email confirmation
+9. Updated schedule shows the swap
+
+## Common Edge Cases to Handle
+
+### Scheduling
+- Employee has overlapping shifts at different locations
+- Shift starts one day and ends the next (overnight shifts)
+- Employee scheduled during blocked-off availability
+- Manager tries to publish incomplete schedule (gaps in coverage)
+- Two managers editing same schedule simultaneously
+
+### Time-Off
+- Request overlaps with blackout period
+- Employee doesn't have enough PTO balance
+- Request submitted for dates in the past
+- Approved request needs to be revoked due to emergency
+
+### Multi-Location
+- Employee works at multiple locations
+- Locations in different timezones
+- Transferring employee between locations
+- Closing a location temporarily
+
+## Voice and Tone
+
+### In-App Copy
+- Friendly but professional
+- Concise and action-oriented
+- No corporate jargon
+- Celebratory for positive actions ("Schedule published! Your team has been notified.")
+- Helpful and clear for errors ("Whoops! Sarah is already scheduled at the downtown location during this time.")
+
+### Marketing Copy
+- Empathetic to manager pain points
+- Results-focused (time saved, stress reduced)
+- Straightforward about pricing and features
+- Accessible to non-technical business owners
+
+## Key Performance Indicators (KPIs)
+
+### Product Metrics
+- Time to create first schedule (target: <10 minutes)
+- Schedules created per week (engagement indicator)
+- Mobile app daily active users
+- Notification open rate
+- Feature adoption rate (% using time-off, shift swaps, etc.)
+
+### Business Metrics
+- Trial signup conversion rate (visitors to trials)
+- Trial activation rate (trials who create a schedule)
+- Trial-to-paid conversion rate
+- Monthly recurring revenue (MRR)
+- Customer churn rate
+
+## Compliance and Legal Considerations
+
+### Data Privacy
+- GDPR compliance for European customers
+- CCPA compliance for California
+- Clear privacy policy and terms of service
+- Data retention and deletion policies
+- Employee data belongs to the organization, not us
+
+### Labor Laws (Awareness, not automation in Phase 1)
+- Overtime rules vary by state
+- Rest period requirements
+- Minor working hour restrictions
+- Meal break requirements
+- Predictive scheduling laws in some cities
+
+## Support and Documentation
+
+### Help Resources Needed
+- Getting started guide for managers
+- Video tutorial: Creating your first schedule
+- FAQ section
+- Mobile app user guide
+- Troubleshooting common issues
+- Keyboard shortcuts reference
+
+### Customer Support Plan
+- Email support (response within 24 hours)
+- In-app chat widget (business hours)
+- Knowledge base/help center
+- Feature request submission form
+- Bug reporting process
+
+## Development Workflow
+
+### Getting Started (Project Setup)
+1. **Backend Setup:**
+   ```bash
+   mkdir shift-scheduler-api && cd shift-scheduler-api
+   npm init -y
+   npm install express prisma @prisma/client typescript ts-node @types/node @types/express
+   npm install jsonwebtoken bcrypt zod cors helmet express-validator
+   npm install -D nodemon @types/jsonwebtoken @types/bcrypt @types/cors
+   npx prisma init
+   ```
+
+2. **Frontend Setup:**
+   ```bash
+   npx create-next-app@latest shift-scheduler-web --typescript --tailwind --app
+   cd shift-scheduler-web
+   npx shadcn-ui@latest init
+   npm install @tanstack/react-query axios react-hook-form zod @hookform/resolvers
+   npm install date-fns @dnd-kit/core @dnd-kit/sortable recharts
+   ```
+
+3. **Database Setup:**
+   - Create PostgreSQL database
+   - Update `.env` with DATABASE_URL
+   - Run `npx prisma migrate dev --name init`
+   - Run `npx prisma generate`
+
+### API Development Pattern
+For each feature, follow this pattern:
+
+1. **Define Prisma Model** (if new entity)
+2. **Create Service** (business logic)
+3. **Create Controller** (route handlers)
+4. **Create Routes** (endpoint definitions)
+5. **Add Validation** (Zod schemas)
+6. **Write Tests** (unit tests for services)
+7. **Update API Documentation**
+
+### Frontend Development Pattern
+For each feature, follow this pattern:
+
+1. **Create API Client Functions** (in `lib/api.ts`)
+2. **Define TypeScript Types** (shared with backend via Zod)
+3. **Build UI Components** (start with shadcn/ui base)
+4. **Implement State Management** (React Query for server state)
+5. **Add Form Validation** (React Hook Form + Zod)
+6. **Handle Loading/Error States**
+7. **Test User Flow**
+
+### Code Quality Standards
+- **TypeScript:** Strict mode enabled, no `any` types
+- **Formatting:** Prettier with consistent config
+- **Linting:** ESLint with recommended rules
+- **Naming Conventions:**
+  - Files: kebab-case (e.g., `schedule-builder.tsx`)
+  - Components: PascalCase (e.g., `ScheduleBuilder`)
+  - Functions/Variables: camelCase (e.g., `getUserSchedule`)
+  - Constants: UPPER_SNAKE_CASE (e.g., `MAX_SHIFTS_PER_DAY`)
+- **Git Commits:** Conventional commits format
+  - `feat: add drag-and-drop schedule builder`
+  - `fix: resolve conflict detection bug`
+  - `docs: update API documentation`
+
+### Environment Variables
+
+**Backend (.env):**
+```
+DATABASE_URL="postgresql://user:password@localhost:5432/scheduler"
+JWT_SECRET="your-super-secret-key"
+JWT_REFRESH_SECRET="your-refresh-secret-key"
+JWT_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+SENDGRID_API_KEY="your-sendgrid-key"
+FRONTEND_URL="http://localhost:3000"
+PORT=5000
+NODE_ENV="development"
+```
+
+**Frontend (.env.local):**
+```
+NEXT_PUBLIC_API_URL="http://localhost:5000/api/v1"
+NEXT_PUBLIC_APP_NAME="ShiftScheduler"
+```
+
+---
+
+## YOUR TASK
+
+[Insert specific task here - examples in the section above]
+
+**When providing assistance:**
+1. Always consider the full project context above
+2. Use Next.js 15 App Router patterns (not Pages Router)
+3. Use Prisma for all database operations (never raw SQL)
+4. Implement proper TypeScript types (no `any`)
+5. Follow the established project structure
+6. Consider multi-tenant security (always filter by organizationId)
+7. Implement proper error handling and validation
+8. Write clean, maintainable, well-commented code
+9. Consider responsive design for web interfaces
+10. Think about scalability and performance
+11. Follow REST API best practices
+12. Implement proper authentication/authorization checks
+
+**Response Format:**
+- Provide complete, working code examples (not pseudocode)
+- Include all necessary imports and type definitions
+- Add helpful comments explaining complex logic
+- Mention any additional packages that need to be installed
+- Highlight potential edge cases or considerations
+- Suggest testing approaches for the feature
+- Note any performance or security implications
+
+---
+
+**Now, here's what I need help with:**
+
+[PASTE YOUR SPECIFIC TASK OR QUESTION HERE]
+
+**Please provide:**
+- Complete, production-ready code implementation
+- Clear explanation of the approach
+- Any database migrations needed (Prisma format)
+- API endpoint specifications (if backend task)
+- Component structure (if frontend task)
+- Testing recommendations
+- Potential issues and how to handle them
+- Next steps or related tasks to consider
