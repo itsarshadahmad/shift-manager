@@ -22,6 +22,7 @@ import NotificationsPage from "@/pages/notifications";
 import ReportsPage from "@/pages/reports";
 import SwapsPage from "@/pages/swaps";
 import ProfilePage from "@/pages/profile";
+import LandingPage from "@/pages/landing";
 
 function AuthenticatedLayout() {
   const style = {
@@ -87,10 +88,11 @@ function AppRouter() {
   if (!user) {
     return (
       <Switch>
+        <Route path="/" component={LandingPage} />
         <Route path="/login" component={LoginPage} />
         <Route path="/register" component={RegisterPage} />
         <Route>
-          <Redirect to="/login" />
+          <Redirect to="/" />
         </Route>
       </Switch>
     );

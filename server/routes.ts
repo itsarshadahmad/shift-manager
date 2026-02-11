@@ -610,5 +610,23 @@ export async function registerRoutes(
     }
   );
 
+  // ── Reports (Owner Only) ──
+  app.get(
+    "/api/reports",
+    authMiddleware,
+    requireRole("owner"),
+    async (req, res) => {
+      try {
+        const shifts = await storage.getShiftsByOrg(req.user!.organizationId);
+        const users = await storage.getUsersByOrg(req.user!.organizationId);
+        const timeOff = await storage.getTimeOffRequestsByOrg(req.user!.organizationId);
+        const safeUsers = users.map(({ password: _, ...u }) => u);
+        return res.json({ shifts, users: safeUsers, timeOff });
+      } catch (err: any) {
+        return res.status(500).json({ message: err.message });
+      }
+    }
+  );
+
   return httpServer;
 }

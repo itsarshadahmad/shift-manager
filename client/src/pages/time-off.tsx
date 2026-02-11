@@ -39,10 +39,10 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { TimeOffRequest, User as UserType } from "@shared/schema";
 
-const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  pending: { label: "Pending", variant: "secondary" },
-  approved: { label: "Approved", variant: "default" },
-  denied: { label: "Denied", variant: "destructive" },
+const statusConfig: Record<string, { label: string; variant: "secondary"; className: string }> = {
+  pending: { label: "Pending", variant: "secondary", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
+  approved: { label: "Approved", variant: "secondary", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  denied: { label: "Denied", variant: "secondary", className: "bg-destructive/15 text-destructive" },
 };
 
 const typeLabels: Record<string, string> = {
@@ -63,6 +63,8 @@ export default function TimeOffPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [type, setType] = useState("vacation");
   const [reason, setReason] = useState("");
+  const [startOpen, setStartOpen] = useState(false);
+  const [endOpen, setEndOpen] = useState(false);
 
   const { data: requests = [], isLoading } = useQuery<TimeOffRequest[]>({
     queryKey: ["/api/time-off"],
@@ -260,7 +262,7 @@ export default function TimeOffPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={cfg.variant} className="text-xs">
+                    <Badge variant={cfg.variant} className={cn("text-xs", cfg.className)}>
                       {cfg.label}
                     </Badge>
                     {isManager && req.status === "pending" && (
@@ -329,7 +331,7 @@ export default function TimeOffPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Popover>
+                <Popover open={startOpen} onOpenChange={setStartOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -347,7 +349,10 @@ export default function TimeOffPage() {
                     <Calendar
                       mode="single"
                       selected={startDate}
-                      onSelect={setStartDate}
+                      onSelect={(date) => {
+                        setStartDate(date);
+                        setStartOpen(false);
+                      }}
                       initialFocus
                     />
                   </PopoverContent>
@@ -355,7 +360,7 @@ export default function TimeOffPage() {
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Popover>
+                <Popover open={endOpen} onOpenChange={setEndOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -373,7 +378,10 @@ export default function TimeOffPage() {
                     <Calendar
                       mode="single"
                       selected={endDate}
-                      onSelect={setEndDate}
+                      onSelect={(date) => {
+                        setEndDate(date);
+                        setEndOpen(false);
+                      }}
                       disabled={(date) => startDate ? date < startDate : false}
                       initialFocus
                     />

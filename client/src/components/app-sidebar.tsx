@@ -27,24 +27,34 @@ import {
   MapPin,
   LogOut,
   ArrowLeftRight,
+  UserCog,
 } from "lucide-react";
 import type { Message, Notification as NotifType } from "@shared/schema";
+
+export const roleConfig: Record<string, { label: string; className: string }> = {
+  owner: { label: "Admin", className: "bg-violet-500/15 text-violet-700 dark:text-violet-400 no-default-hover-elevate no-default-active-elevate" },
+  manager: { label: "Manager", className: "bg-sky-500/15 text-sky-700 dark:text-sky-400 no-default-hover-elevate no-default-active-elevate" },
+  employee: { label: "Employee", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate" },
+};
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Schedule", url: "/schedule", icon: Calendar },
   { title: "Time Off", url: "/time-off", icon: CalendarOff },
   { title: "Swap Requests", url: "/swaps", icon: ArrowLeftRight },
-  { title: "Employees", url: "/employees", icon: Users },
-  { title: "Locations", url: "/locations", icon: MapPin },
+  { title: "Employees", url: "/employees", icon: Users, managerOnly: true },
+  { title: "Locations", url: "/locations", icon: MapPin, managerOnly: true },
   { title: "Messages", url: "/messages", icon: MessageSquare, badgeKey: "messages" as const },
   { title: "Notifications", url: "/notifications", icon: Bell, badgeKey: "notifications" as const },
-  { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Reports", url: "/reports", icon: BarChart3, ownerOnly: true },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const isManager = user?.role === "owner" || user?.role === "manager";
+  const isOwner = user?.role === "owner";
 
   const { data: allMessages = [] } = useQuery<Message[]>({
     queryKey: ["/api/messages"],
@@ -71,6 +81,14 @@ export function AppSidebar() {
     ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase()
     : "??";
 
+  const roleCfg = roleConfig[user?.role || "employee"];
+
+  const filteredNav = navItems.filter((item) => {
+    if ((item as any).ownerOnly && !isOwner) return false;
+    if ((item as any).managerOnly && !isManager) return false;
+    return true;
+  });
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
@@ -80,9 +98,9 @@ export function AppSidebar() {
           </div>
           <div>
             <span className="font-bold text-sm">ShiftFlow</span>
-            <span className="block text-xs text-muted-foreground capitalize">
-              {user?.role || "employee"}
-            </span>
+            <Badge variant="secondary" className={`block text-[10px] mt-0.5 w-fit ${roleCfg.className}`}>
+              {roleCfg.label}
+            </Badge>
           </div>
         </Link>
       </SidebarHeader>
@@ -92,7 +110,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
+              {filteredNav.map((item) => {
                 const isActive = location === item.url || location.startsWith(item.url + "/");
                 const badgeCount = (item as any).badgeKey ? badgeCounts[(item as any).badgeKey] || 0 : 0;
                 return (
@@ -123,7 +141,7 @@ export function AppSidebar() {
         <div className="flex items-center gap-3">
           <Link href="/profile" className="flex items-center gap-3 flex-1 min-w-0">
             <Avatar className="w-9 h-9">
-              <AvatarFallback className="text-xs bg-muted">
+              <AvatarFallback className="text-xs bg-primary/10 text-primary">
                 {initials}
               </AvatarFallback>
             </Avatar>
@@ -140,6 +158,7 @@ export function AppSidebar() {
             size="icon"
             variant="ghost"
             onClick={logout}
+            className="text-destructive"
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />

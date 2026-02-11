@@ -36,7 +36,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-background">
       <div className="hidden lg:flex lg:flex-1 bg-primary relative overflow-hidden items-center justify-center">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-blue-900 opacity-90" />
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 opacity-95" />
         <div className="relative z-10 p-12 max-w-lg">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 rounded-md bg-primary-foreground/20 flex items-center justify-center">

@@ -36,6 +36,7 @@ import {
   DollarSign,
   Pencil,
 } from "lucide-react";
+import { roleConfig } from "@/components/app-sidebar";
 import type { User as UserType } from "@shared/schema";
 
 export default function EmployeesPage() {
@@ -243,8 +244,8 @@ export default function EmployeesPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
-                    <Badge variant={emp.role === "owner" ? "default" : "secondary"} className="text-xs capitalize">
-                      {emp.role}
+                    <Badge variant="secondary" className={`text-xs ${roleConfig[emp.role]?.className || ""}`}>
+                      {roleConfig[emp.role]?.label || emp.role}
                     </Badge>
                     {!emp.isActive && (
                       <Badge variant="destructive" className="text-xs">Inactive</Badge>

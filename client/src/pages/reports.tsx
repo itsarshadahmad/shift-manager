@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -9,6 +11,7 @@ import {
   Users,
   CalendarOff,
   TrendingUp,
+  ShieldAlert,
 } from "lucide-react";
 import {
   BarChart,
@@ -27,31 +30,40 @@ import type { Shift, TimeOffRequest, User as UserType } from "@shared/schema";
 import { differenceInHours } from "date-fns";
 
 const COLORS = [
-  "hsl(217, 91%, 35%)",
-  "hsl(173, 58%, 39%)",
-  "hsl(197, 37%, 45%)",
-  "hsl(43, 74%, 49%)",
-  "hsl(27, 87%, 47%)",
+  "hsl(243, 75%, 59%)",
+  "hsl(168, 60%, 42%)",
+  "hsl(200, 65%, 48%)",
+  "hsl(35, 92%, 55%)",
+  "hsl(280, 65%, 55%)",
 ];
 
 export default function ReportsPage() {
-  const { data: shifts = [], isLoading: loadingShifts } = useQuery<Shift[]>({
-    queryKey: ["/api/shifts"],
+  const { user } = useAuth();
+
+  const { data: reportData, isLoading } = useQuery<{
+    shifts: Shift[];
+    users: UserType[];
+    timeOff: TimeOffRequest[];
+  }>({
+    queryKey: ["/api/reports"],
+    enabled: user?.role === "owner",
   });
 
-  const { data: employees = [], isLoading: loadingEmployees } = useQuery<
-    UserType[]
-  >({
-    queryKey: ["/api/users"],
-  });
+  const shifts = reportData?.shifts ?? [];
+  const employees = reportData?.users ?? [];
+  const timeOffRequests = reportData?.timeOff ?? [];
 
-  const { data: timeOffRequests = [], isLoading: loadingTimeOff } = useQuery<
-    TimeOffRequest[]
-  >({
-    queryKey: ["/api/time-off"],
-  });
-
-  const isLoading = loadingShifts || loadingEmployees || loadingTimeOff;
+  if (user?.role !== "owner") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center" data-testid="reports-access-denied">
+        <ShieldAlert className="w-12 h-12 text-muted-foreground/40 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Reports are only available to administrators.
+        </p>
+      </div>
+    );
+  }
 
   const hoursPerEmployee = employees
     .filter((e) => e.isActive)

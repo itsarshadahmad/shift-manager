@@ -4,19 +4,20 @@
 Cloud-agnostic, self-hostable employee shift scheduling platform. Multi-tenant architecture with role-based access control (Owner, Manager, Employee).
 
 ## Current State
-MVP complete with all core features: authentication, schedule management, time-off, messaging, shift swaps, notifications, and reporting. Enhanced with shadcn Calendar date pickers, threaded messaging with conversation view, unread badges in sidebar, comprehensive client-side validation, and user-friendly error messages throughout.
+MVP complete with all core features: authentication, schedule management, time-off, messaging, shift swaps, notifications, and reporting. Enhanced with modern indigo-violet theming, professional SaaS landing page, responsive design, role-aware dashboards, and comprehensive deployment documentation.
 
 ### Recent Changes
-- Schedule page: weekly calendar layout with shift detail popup dialog, shift cards with avatars and status badges
-- Full CRUD: employees and locations have edit dialogs with PATCH endpoints
-- Profile page: /profile with password change and personal details editing
-- User update API: PATCH /api/users/:id with role-based permissions
-- Password change: POST /api/auth/change-password with current password verification
-- Employee search: case-insensitive multi-word fuzzy matching across name, email, role, position
-- Message search: case-insensitive searching across subject, body, and sender name
-- Reports: includes scheduled+published+completed shifts in hour calculations
-- Role-based data access: employees only see their own time-off requests and swap requests
-- Auth context: refetchUser added for profile updates
+- Theme: Modern indigo-violet color scheme (243 75% 59%) with blue-tinted dark mode (228 18% 10%), warm accent chart colors
+- Landing page: Professional SaaS landing at "/" with hero, features grid, how-it-works, pricing, footer
+- Role badges: Distinct colors for Admin (violet), Manager (sky), Employee (emerald) via exported roleConfig
+- Schedule page: Responsive layout (desktop 7-col grid, tablet scroll, mobile single-day), searchable employee combobox (Popover+Command), custom 12h time picker, colored status badges
+- Dashboard: Role-aware content - admin/manager stats vs employee personal analytics (My Shifts, Hours, Next Shift)
+- Reports: Owner-only access with server-side /api/reports endpoint using requireRole("owner") + client-side guard
+- Time-off: Controlled Popover for date picker auto-close, colored status badges (amber/emerald/red)
+- Login: Indigo-violet gradient on left panel
+- Red destructive logout button in sidebar
+- Employees page: Uses roleConfig for consistent colored role badges
+- SEO: Title, meta description, and OpenGraph tags in index.html
 
 ## Architecture
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
@@ -32,22 +33,19 @@ MVP complete with all core features: authentication, schedule management, time-o
 
 ## Key Files
 - `shared/schema.ts` - All database models and types
-- `server/routes.ts` - All API endpoints
+- `server/routes.ts` - All API endpoints (includes /api/reports with owner-only middleware)
 - `server/storage.ts` - DatabaseStorage layer (IStorage interface)
-- `server/auth.ts` - JWT authentication middleware
-- `server/seed.ts` - Sample data seeder
+- `server/auth.ts` - JWT authentication middleware + requireRole helper
 - `client/src/App.tsx` - Main app with routing and layout
 - `client/src/lib/auth.tsx` - Auth context provider
+- `client/src/components/app-sidebar.tsx` - Sidebar with roleConfig export
+- `client/src/pages/landing.tsx` - SaaS landing page
 
 ## Development
 - Start: `npm run dev` (serves on port 5000)
 - DB push: `npm run db:push`
 - Build: `npm run build`
 - Production: `npm start`
-
-## Default Login
-- admin@sunrisecafe.com / password123 (Owner)
-- manager@sunrisecafe.com / password123 (Manager)
 
 ## Documentation
 - README.md, CONFIGURATION.md, DEPLOYMENT.md, DATABASE.md, API.md
@@ -56,3 +54,4 @@ MVP complete with all core features: authentication, schedule management, time-o
 - Cloud-agnostic (no Replit-specific services)
 - Self-hostable with comprehensive deployment docs
 - Standard PostgreSQL, JWT auth, SMTP-ready
+- Theme: Indigo-violet primary, role-based badge colors
