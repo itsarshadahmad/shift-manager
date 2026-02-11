@@ -13,7 +13,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -23,17 +22,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus,
   CalendarOff,
+  CalendarIcon,
   Check,
   X,
   Loader2,
   Clock,
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import type { TimeOffRequest, User as UserType } from "@shared/schema";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -56,12 +59,10 @@ export default function TimeOffPage() {
   const [tab, setTab] = useState("all");
   const isManager = user?.role === "owner" || user?.role === "manager";
 
-  const [formData, setFormData] = useState({
-    startDate: "",
-    endDate: "",
-    type: "vacation",
-    reason: "",
-  });
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [type, setType] = useState("vacation");
+  const [reason, setReason] = useState("");
 
   const { data: requests = [], isLoading } = useQuery<TimeOffRequest[]>({
     queryKey: ["/api/time-off"],
@@ -78,12 +79,13 @@ export default function TimeOffPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-off"] });
-      toast({ title: "Time-off request submitted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      toast({ title: "Time-off request submitted successfully" });
       setShowDialog(false);
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not submit request",
         description: err.message,
         variant: "destructive",
       });
@@ -105,11 +107,12 @@ export default function TimeOffPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/time-off"] });
-      toast({ title: "Request updated" });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      toast({ title: "Request updated successfully" });
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not update request",
         description: err.message,
         variant: "destructive",
       });
@@ -117,13 +120,23 @@ export default function TimeOffPage() {
   });
 
   const handleCreate = () => {
+    if (!startDate) {
+      toast({ title: "Please select a start date", variant: "destructive" });
+      return;
+    }
+    if (!endDate) {
+      toast({ title: "Please select an end date", variant: "destructive" });
+      return;
+    }
+    if (endDate < startDate) {
+      toast({ title: "End date must be after start date", variant: "destructive" });
+      return;
+    }
     createRequest.mutate({
-      organizationId: user!.organizationId,
-      userId: user!.id,
-      startDate: new Date(formData.startDate).toISOString(),
-      endDate: new Date(formData.endDate).toISOString(),
-      type: formData.type,
-      reason: formData.reason || null,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      type,
+      reason: reason || null,
       status: "pending",
     });
   };
@@ -161,12 +174,10 @@ export default function TimeOffPage() {
         </div>
         <Button
           onClick={() => {
-            setFormData({
-              startDate: "",
-              endDate: "",
-              type: "vacation",
-              reason: "",
-            });
+            setStartDate(undefined);
+            setEndDate(undefined);
+            setType("vacation");
+            setReason("");
             setShowDialog(true);
           }}
           data-testid="button-request-time-off"
@@ -297,10 +308,8 @@ export default function TimeOffPage() {
             <div className="space-y-2">
               <Label>Type</Label>
               <Select
-                value={formData.type}
-                onValueChange={(v) =>
-                  setFormData((f) => ({ ...f, type: v }))
-                }
+                value={type}
+                onValueChange={setType}
               >
                 <SelectTrigger data-testid="select-time-off-type">
                   <SelectValue />
@@ -316,41 +325,64 @@ export default function TimeOffPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      startDate: e.target.value,
-                    }))
-                  }
-                  data-testid="input-start-date"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                      data-testid="input-start-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={startDate}
+                      onSelect={setStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      endDate: e.target.value,
-                    }))
-                  }
-                  data-testid="input-end-date"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                      data-testid="input-end-date"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      disabled={(date) => startDate ? date < startDate : false}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="space-y-2">
               <Label>Reason (optional)</Label>
               <Textarea
                 placeholder="Briefly describe your reason..."
-                value={formData.reason}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, reason: e.target.value }))
-                }
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
                 className="resize-none"
                 data-testid="input-reason"
               />
@@ -364,8 +396,8 @@ export default function TimeOffPage() {
               onClick={handleCreate}
               disabled={
                 createRequest.isPending ||
-                !formData.startDate ||
-                !formData.endDate
+                !startDate ||
+                !endDate
               }
               data-testid="button-submit-request"
             >

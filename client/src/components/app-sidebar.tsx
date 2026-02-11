@@ -1,4 +1,5 @@
 import { useLocation, Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Calendar,
@@ -26,6 +28,7 @@ import {
   LogOut,
   ArrowLeftRight,
 } from "lucide-react";
+import type { Message, Notification as NotifType } from "@shared/schema";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -34,14 +37,35 @@ const navItems = [
   { title: "Swap Requests", url: "/swaps", icon: ArrowLeftRight },
   { title: "Employees", url: "/employees", icon: Users },
   { title: "Locations", url: "/locations", icon: MapPin },
-  { title: "Messages", url: "/messages", icon: MessageSquare },
-  { title: "Notifications", url: "/notifications", icon: Bell },
+  { title: "Messages", url: "/messages", icon: MessageSquare, badgeKey: "messages" as const },
+  { title: "Notifications", url: "/notifications", icon: Bell, badgeKey: "notifications" as const },
   { title: "Reports", url: "/reports", icon: BarChart3 },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const { data: allMessages = [] } = useQuery<Message[]>({
+    queryKey: ["/api/messages"],
+    refetchInterval: 15000,
+  });
+
+  const { data: allNotifications = [] } = useQuery<NotifType[]>({
+    queryKey: ["/api/notifications"],
+    refetchInterval: 15000,
+  });
+
+  const unreadMessages = allMessages.filter(
+    (m) => !m.isRead && (m.recipientId === user?.id || (m.isBroadcast && m.senderId !== user?.id))
+  ).length;
+
+  const unreadNotifications = allNotifications.filter((n) => !n.isRead).length;
+
+  const badgeCounts: Record<string, number> = {
+    messages: unreadMessages,
+    notifications: unreadNotifications,
+  };
 
   const initials = user
     ? `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase()
@@ -70,6 +94,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {navItems.map((item) => {
                 const isActive = location === item.url || location.startsWith(item.url + "/");
+                const badgeCount = (item as any).badgeKey ? badgeCounts[(item as any).badgeKey] || 0 : 0;
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
@@ -78,7 +103,12 @@ export function AppSidebar() {
                     >
                       <Link href={item.url}>
                         <item.icon className="w-4 h-4" />
-                        <span>{item.title}</span>
+                        <span className="flex-1">{item.title}</span>
+                        {badgeCount > 0 && (
+                          <Badge variant="default" className="text-xs ml-auto no-default-hover-elevate no-default-active-elevate">
+                            {badgeCount}
+                          </Badge>
+                        )}
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

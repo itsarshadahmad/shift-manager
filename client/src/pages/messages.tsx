@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -25,7 +25,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus,
@@ -34,15 +33,35 @@ import {
   Send,
   Megaphone,
   Mail,
+  ArrowLeft,
+  Reply,
+  Search,
 } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import type { Message, User as UserType } from "@shared/schema";
+
+function getInitials(firstName?: string, lastName?: string) {
+  return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase() || "??";
+}
+
+interface ConversationThread {
+  partnerId: string | null;
+  partner: UserType | undefined;
+  isBroadcast: boolean;
+  lastMessage: Message;
+  messages: Message[];
+  unreadCount: number;
+}
 
 export default function MessagesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [showDialog, setShowDialog] = useState(false);
-  const [tab, setTab] = useState("inbox");
+  const [showComposeDialog, setShowComposeDialog] = useState(false);
+  const [selectedThread, setSelectedThread] = useState<ConversationThread | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     recipientId: "",
@@ -53,6 +72,7 @@ export default function MessagesPage() {
 
   const { data: messages = [], isLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages"],
+    refetchInterval: 10000,
   });
 
   const { data: employees = [] } = useQuery<UserType[]>({
@@ -66,12 +86,14 @@ export default function MessagesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({ title: "Message sent" });
-      setShowDialog(false);
+      setShowComposeDialog(false);
+      setReplyBody("");
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not send message",
         description: err.message,
         variant: "destructive",
       });
@@ -87,10 +109,54 @@ export default function MessagesPage() {
     },
   });
 
+  const threads = buildThreads(messages, employees, user);
+
+  const filteredThreads = searchQuery
+    ? threads.filter((t) => {
+        const name = t.isBroadcast
+          ? "Broadcast"
+          : t.partner
+            ? `${t.partner.firstName} ${t.partner.lastName}`
+            : "";
+        return (
+          name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          t.lastMessage.subject.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      })
+    : threads;
+
+  useEffect(() => {
+    if (selectedThread) {
+      const updated = threads.find((t) =>
+        t.isBroadcast
+          ? selectedThread.isBroadcast
+          : t.partnerId === selectedThread.partnerId
+      );
+      if (updated) {
+        setSelectedThread(updated);
+        updated.messages.forEach((msg) => {
+          if (!msg.isRead && msg.recipientId === user?.id) {
+            markRead.mutate(msg.id);
+          }
+        });
+      }
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [selectedThread?.messages.length]);
+
   const handleSend = () => {
+    if (!formData.subject || !formData.body) {
+      toast({ title: "Please fill in subject and message", variant: "destructive" });
+      return;
+    }
+    if (!formData.isBroadcast && !formData.recipientId) {
+      toast({ title: "Please select a recipient", variant: "destructive" });
+      return;
+    }
     sendMessage.mutate({
-      organizationId: user!.organizationId,
-      senderId: user!.id,
       recipientId: formData.isBroadcast ? null : formData.recipientId,
       subject: formData.subject,
       body: formData.body,
@@ -98,11 +164,24 @@ export default function MessagesPage() {
     });
   };
 
-  const inbox = messages.filter(
-    (m) => m.recipientId === user?.id || m.isBroadcast
-  );
-  const sent = messages.filter((m) => m.senderId === user?.id);
-  const displayMessages = tab === "inbox" ? inbox : sent;
+  const handleReply = () => {
+    if (!replyBody.trim() || !selectedThread) return;
+    sendMessage.mutate({
+      recipientId: selectedThread.isBroadcast ? null : selectedThread.partnerId,
+      subject: `Re: ${selectedThread.lastMessage.subject.replace(/^Re: /i, "")}`,
+      body: replyBody,
+      isBroadcast: selectedThread.isBroadcast,
+    });
+  };
+
+  const openThread = (thread: ConversationThread) => {
+    setSelectedThread(thread);
+    thread.messages.forEach((msg) => {
+      if (!msg.isRead && msg.recipientId === user?.id) {
+        markRead.mutate(msg.id);
+      }
+    });
+  };
 
   if (isLoading) {
     return (
@@ -111,6 +190,124 @@ export default function MessagesPage() {
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-20" />
         ))}
+      </div>
+    );
+  }
+
+  if (selectedThread) {
+    const partner = selectedThread.partner;
+    const threadSubject = selectedThread.lastMessage.subject.replace(/^Re: /i, "");
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className="p-4 border-b border-border flex items-center gap-3 sticky top-0 bg-background z-10">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setSelectedThread(null)}
+            data-testid="button-back-to-messages"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <Avatar className="w-9 h-9 flex-shrink-0">
+            <AvatarFallback className="text-xs">
+              {selectedThread.isBroadcast
+                ? "BC"
+                : getInitials(partner?.firstName, partner?.lastName)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-sm truncate">
+              {selectedThread.isBroadcast
+                ? "Team Broadcast"
+                : partner
+                  ? `${partner.firstName} ${partner.lastName}`
+                  : "Unknown"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {threadSubject}
+            </p>
+          </div>
+          {selectedThread.isBroadcast && (
+            <Badge variant="secondary" className="text-xs flex-shrink-0">
+              <Megaphone className="w-3 h-3 mr-1" />
+              Broadcast
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          {selectedThread.messages
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            .map((msg) => {
+              const isMine = msg.senderId === user?.id;
+              const sender = employees.find((e) => e.id === msg.senderId);
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex gap-3",
+                    isMine ? "flex-row-reverse" : "flex-row"
+                  )}
+                  data-testid={`message-bubble-${msg.id}`}
+                >
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarFallback className="text-xs">
+                      {getInitials(sender?.firstName, sender?.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div
+                    className={cn(
+                      "max-w-[70%] rounded-md p-3",
+                      isMine
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="text-xs font-medium">
+                        {isMine ? "You" : sender ? `${sender.firstName} ${sender.lastName}` : "Unknown"}
+                      </span>
+                      <span className={cn("text-xs", isMine ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                        {format(new Date(msg.createdAt), "MMM d, h:mm a")}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
+                  </div>
+                </div>
+              );
+            })}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Type your reply..."
+              value={replyBody}
+              onChange={(e) => setReplyBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleReply();
+                }
+              }}
+              className="flex-1"
+              data-testid="input-reply"
+            />
+            <Button
+              onClick={handleReply}
+              disabled={sendMessage.isPending || !replyBody.trim()}
+              data-testid="button-send-reply"
+            >
+              {sendMessage.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -137,7 +334,7 @@ export default function MessagesPage() {
               body: "",
               isBroadcast: false,
             });
-            setShowDialog(true);
+            setShowComposeDialog(true);
           }}
           data-testid="button-compose"
         >
@@ -146,94 +343,110 @@ export default function MessagesPage() {
         </Button>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="inbox" data-testid="tab-inbox">
-            <Mail className="w-4 h-4 mr-2" />
-            Inbox ({inbox.filter((m) => !m.isRead).length})
-          </TabsTrigger>
-          <TabsTrigger value="sent" data-testid="tab-sent">
-            <Send className="w-4 h-4 mr-2" />
-            Sent
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search messages..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          data-testid="input-search-messages"
+        />
+      </div>
 
-      {displayMessages.length === 0 ? (
+      {filteredThreads.length === 0 ? (
         <Card className="p-12">
           <div className="flex flex-col items-center justify-center text-center">
             <MessageSquare className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <h3 className="font-medium mb-1">
-              {tab === "inbox" ? "No messages" : "No sent messages"}
+              {searchQuery ? "No messages match your search" : "No conversations yet"}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {tab === "inbox"
-                ? "Your inbox is empty."
-                : "You haven't sent any messages yet."}
+              {searchQuery
+                ? "Try a different search term."
+                : "Start a conversation by clicking Compose."}
             </p>
           </div>
         </Card>
       ) : (
         <div className="space-y-2">
-          {displayMessages.map((msg) => {
-            const sender = employees.find((e) => e.id === msg.senderId);
-            const recipient = employees.find(
-              (e) => e.id === msg.recipientId
+          {filteredThreads.map((thread, idx) => {
+            const sender = employees.find(
+              (e) => e.id === thread.lastMessage.senderId
             );
-            const isUnread = !msg.isRead && tab === "inbox";
+            const hasUnread = thread.unreadCount > 0;
 
             return (
               <Card
-                key={msg.id}
-                className={`p-4 cursor-pointer hover-elevate ${isUnread ? "border-primary/30" : ""}`}
-                onClick={() => {
-                  if (isUnread) markRead.mutate(msg.id);
-                }}
-                data-testid={`message-card-${msg.id}`}
+                key={idx}
+                className={cn(
+                  "p-4 cursor-pointer hover-elevate",
+                  hasUnread && "border-primary/30"
+                )}
+                onClick={() => openThread(thread)}
+                data-testid={`thread-card-${idx}`}
               >
                 <div className="flex items-start gap-4">
                   <Avatar className="w-9 h-9 flex-shrink-0">
                     <AvatarFallback className="text-xs">
-                      {sender
-                        ? `${sender.firstName[0]}${sender.lastName[0]}`
-                        : "??"}
+                      {thread.isBroadcast
+                        ? "BC"
+                        : getInitials(
+                            thread.partner?.firstName,
+                            thread.partner?.lastName
+                          )}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`text-sm ${isUnread ? "font-bold" : "font-medium"}`}
+                        className={cn(
+                          "text-sm",
+                          hasUnread ? "font-bold" : "font-medium"
+                        )}
                       >
-                        {tab === "inbox"
-                          ? sender
-                            ? `${sender.firstName} ${sender.lastName}`
-                            : "Unknown"
-                          : recipient
-                            ? `To: ${recipient.firstName} ${recipient.lastName}`
-                            : "Broadcast"}
+                        {thread.isBroadcast
+                          ? "Team Broadcast"
+                          : thread.partner
+                            ? `${thread.partner.firstName} ${thread.partner.lastName}`
+                            : "Unknown"}
                       </span>
-                      {msg.isBroadcast && (
+                      {thread.isBroadcast && (
                         <Badge variant="secondary" className="text-xs">
                           <Megaphone className="w-3 h-3 mr-1" />
                           Broadcast
                         </Badge>
                       )}
-                      {isUnread && (
-                        <div className="w-2 h-2 rounded-full bg-primary" />
+                      {hasUnread && (
+                        <Badge variant="default" className="text-xs">
+                          {thread.unreadCount}
+                        </Badge>
                       )}
                     </div>
                     <p
-                      className={`text-sm truncate ${isUnread ? "font-medium" : ""}`}
+                      className={cn(
+                        "text-sm truncate",
+                        hasUnread ? "font-medium" : ""
+                      )}
                     >
-                      {msg.subject}
+                      {thread.lastMessage.subject}
                     </p>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {msg.body}
+                      {thread.lastMessage.senderId === user?.id ? "You: " : ""}
+                      {thread.lastMessage.body}
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground flex-shrink-0">
-                    {format(new Date(msg.createdAt), "MMM d, h:mm a")}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {format(
+                        new Date(thread.lastMessage.createdAt),
+                        "MMM d"
+                      )}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {thread.messages.length} msg{thread.messages.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
                 </div>
               </Card>
             );
@@ -241,7 +454,7 @@ export default function MessagesPage() {
         </div>
       )}
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <Dialog open={showComposeDialog} onOpenChange={setShowComposeDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Compose Message</DialogTitle>
@@ -313,7 +526,7 @@ export default function MessagesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button variant="outline" onClick={() => setShowComposeDialog(false)}>
               Cancel
             </Button>
             <Button
@@ -337,4 +550,69 @@ export default function MessagesPage() {
       </Dialog>
     </div>
   );
+}
+
+function buildThreads(
+  messages: Message[],
+  employees: UserType[],
+  user: UserType | null
+): ConversationThread[] {
+  if (!user) return [];
+
+  const broadcastMessages = messages.filter((m) => m.isBroadcast);
+  const directMessages = messages.filter(
+    (m) => !m.isBroadcast && (m.senderId === user.id || m.recipientId === user.id)
+  );
+
+  const threads: ConversationThread[] = [];
+
+  if (broadcastMessages.length > 0) {
+    const sorted = broadcastMessages.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    threads.push({
+      partnerId: null,
+      partner: undefined,
+      isBroadcast: true,
+      lastMessage: sorted[0],
+      messages: broadcastMessages,
+      unreadCount: broadcastMessages.filter(
+        (m) => !m.isRead && m.senderId !== user.id
+      ).length,
+    });
+  }
+
+  const partnerMap = new Map<string, Message[]>();
+  directMessages.forEach((msg) => {
+    const partnerId =
+      msg.senderId === user.id ? msg.recipientId! : msg.senderId;
+    const existing = partnerMap.get(partnerId) || [];
+    existing.push(msg);
+    partnerMap.set(partnerId, existing);
+  });
+
+  partnerMap.forEach((msgs, partnerId) => {
+    const sorted = msgs.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    const partner = employees.find((e) => e.id === partnerId);
+    threads.push({
+      partnerId,
+      partner,
+      isBroadcast: false,
+      lastMessage: sorted[0],
+      messages: msgs,
+      unreadCount: msgs.filter(
+        (m) => !m.isRead && m.recipientId === user.id
+      ).length,
+    });
+  });
+
+  threads.sort(
+    (a, b) =>
+      new Date(b.lastMessage.createdAt).getTime() -
+      new Date(a.lastMessage.createdAt).getTime()
+  );
+
+  return threads;
 }

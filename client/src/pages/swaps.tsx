@@ -75,12 +75,13 @@ export default function SwapsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swaps"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({ title: "Swap request submitted" });
       setShowDialog(false);
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not submit swap request",
         description: err.message,
         variant: "destructive",
       });
@@ -101,11 +102,12 @@ export default function SwapsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/swaps"] });
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({ title: "Swap request updated" });
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not update swap request",
         description: err.message,
         variant: "destructive",
       });
@@ -113,6 +115,14 @@ export default function SwapsPage() {
   });
 
   const handleCreate = () => {
+    if (!formData.shiftId) {
+      toast({ title: "Please select a shift to swap", variant: "destructive" });
+      return;
+    }
+    if (!formData.targetUserId) {
+      toast({ title: "Please select an employee to swap with", variant: "destructive" });
+      return;
+    }
     createSwap.mutate({
       organizationId: user!.organizationId,
       shiftId: formData.shiftId,

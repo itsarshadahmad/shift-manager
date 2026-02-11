@@ -70,7 +70,7 @@ export default function EmployeesPage() {
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not add employee",
         description: err.message,
         variant: "destructive",
       });
@@ -78,6 +78,18 @@ export default function EmployeesPage() {
   });
 
   const handleCreate = () => {
+    if (!formData.firstName || !formData.lastName) {
+      toast({ title: "Please enter the employee's first and last name", variant: "destructive" });
+      return;
+    }
+    if (!formData.email) {
+      toast({ title: "Please enter the employee's email address", variant: "destructive" });
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
     createUser.mutate({
       organizationId: user!.organizationId,
       email: formData.email,

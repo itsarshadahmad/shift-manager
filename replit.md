@@ -4,7 +4,7 @@
 Cloud-agnostic, self-hostable employee shift scheduling platform. Multi-tenant architecture with role-based access control (Owner, Manager, Employee).
 
 ## Current State
-MVP complete with all core features: authentication, schedule management, time-off, messaging, shift swaps, notifications, and reporting.
+MVP complete with all core features: authentication, schedule management, time-off, messaging, shift swaps, notifications, and reporting. Enhanced with shadcn Calendar date pickers, threaded messaging with conversation view, unread badges in sidebar, comprehensive client-side validation, and user-friendly error messages throughout.
 
 ## Architecture
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui

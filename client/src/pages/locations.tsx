@@ -47,7 +47,7 @@ export default function LocationsPage() {
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not add location",
         description: err.message,
         variant: "destructive",
       });
@@ -55,6 +55,10 @@ export default function LocationsPage() {
   });
 
   const handleCreate = () => {
+    if (!formData.name) {
+      toast({ title: "Please enter a location name", variant: "destructive" });
+      return;
+    }
     createLocation.mutate({
       organizationId: user!.organizationId,
       name: formData.name,

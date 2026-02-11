@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -60,6 +60,14 @@ function AuthenticatedLayout() {
   );
 }
 
+function AuthRedirect() {
+  const [location] = useLocation();
+  if (location === "/login" || location === "/register") {
+    return <Redirect to="/dashboard" />;
+  }
+  return null;
+}
+
 function AppRouter() {
   const { user, isLoading } = useAuth();
 
@@ -86,7 +94,12 @@ function AppRouter() {
     );
   }
 
-  return <AuthenticatedLayout />;
+  return (
+    <>
+      <AuthRedirect />
+      <AuthenticatedLayout />
+    </>
+  );
 }
 
 function App() {

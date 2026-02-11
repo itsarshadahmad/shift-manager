@@ -147,12 +147,12 @@ export default function SchedulePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      toast({ title: "Shift created" });
+      toast({ title: "Shift created successfully" });
       setShowDialog(false);
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not create shift",
         description: err.message,
         variant: "destructive",
       });
@@ -166,12 +166,12 @@ export default function SchedulePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
-      toast({ title: "Shift updated" });
+      toast({ title: "Shift updated successfully" });
       setShowDialog(false);
     },
     onError: (err: Error) => {
       toast({
-        title: "Error",
+        title: "Could not update shift",
         description: err.message,
         variant: "destructive",
       });
@@ -186,6 +186,13 @@ export default function SchedulePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({ title: "Shift deleted" });
       setShowDialog(false);
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Could not delete shift",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -224,8 +231,22 @@ export default function SchedulePage() {
   const handleSave = () => {
     if (!selectedDate) return;
 
+    if (!formData.locationId) {
+      toast({ title: "Please select a location", variant: "destructive" });
+      return;
+    }
+    if (!formData.startTime || !formData.endTime) {
+      toast({ title: "Please set both start and end times", variant: "destructive" });
+      return;
+    }
+
     const [startH, startM] = formData.startTime.split(":").map(Number);
     const [endH, endM] = formData.endTime.split(":").map(Number);
+
+    if (endH < startH || (endH === startH && endM <= startM)) {
+      toast({ title: "End time must be after start time", variant: "destructive" });
+      return;
+    }
 
     const startTime = setMinutes(
       setHours(new Date(selectedDate), startH),

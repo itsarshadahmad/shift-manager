@@ -191,10 +191,29 @@ export async function registerRoutes(
     requireRole("owner", "manager"),
     async (req, res) => {
       try {
+        if (!req.body.locationId) {
+          return res.status(400).json({ message: "Please select a location for this shift." });
+        }
+        if (!req.body.startTime || !req.body.endTime) {
+          return res.status(400).json({ message: "Please provide both a start time and end time for this shift." });
+        }
+        const startTime = new Date(req.body.startTime);
+        const endTime = new Date(req.body.endTime);
+        if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+          return res.status(400).json({ message: "The times you entered are not valid. Please select valid start and end times." });
+        }
+        if (endTime <= startTime) {
+          return res.status(400).json({ message: "The end time must be after the start time." });
+        }
         const data = {
-          ...req.body,
           organizationId: req.user!.organizationId,
+          locationId: req.body.locationId,
           userId: req.body.userId === "unassigned" ? null : req.body.userId || null,
+          startTime,
+          endTime,
+          position: req.body.position || null,
+          notes: req.body.notes || null,
+          status: req.body.status || "scheduled",
         };
         const shift = await storage.createShift(data);
         return res.json(shift);
@@ -217,10 +236,15 @@ export async function registerRoutes(
         ) {
           return res.status(404).json({ message: "Shift not found" });
         }
-        const updated = {
-          ...req.body,
+        const updated: any = {
           userId: req.body.userId === "unassigned" ? null : req.body.userId,
         };
+        if (req.body.startTime) updated.startTime = new Date(req.body.startTime);
+        if (req.body.endTime) updated.endTime = new Date(req.body.endTime);
+        if (req.body.locationId) updated.locationId = req.body.locationId;
+        if (req.body.position !== undefined) updated.position = req.body.position;
+        if (req.body.notes !== undefined) updated.notes = req.body.notes;
+        if (req.body.status) updated.status = req.body.status;
         const shift = await storage.updateShift(req.params.id, updated);
         return res.json(shift);
       } catch (err: any) {
@@ -260,10 +284,28 @@ export async function registerRoutes(
 
   app.post("/api/time-off", authMiddleware, async (req, res) => {
     try {
+      if (!req.body.startDate || !req.body.endDate) {
+        return res.status(400).json({ message: "Please select both a start date and end date for your time-off request." });
+      }
+      if (!req.body.type) {
+        return res.status(400).json({ message: "Please select a time-off type (vacation, sick, personal, or unpaid)." });
+      }
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(req.body.endDate);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return res.status(400).json({ message: "The dates you entered are not valid. Please pick valid start and end dates." });
+      }
+      if (endDate < startDate) {
+        return res.status(400).json({ message: "The end date must be after the start date." });
+      }
       const request = await storage.createTimeOffRequest({
-        ...req.body,
         organizationId: req.user!.organizationId,
         userId: req.body.userId || req.user!.id,
+        startDate,
+        endDate,
+        type: req.body.type,
+        reason: req.body.reason || null,
+        status: req.body.status || "pending",
       });
       return res.json(request);
     } catch (err: any) {
@@ -292,6 +334,17 @@ export async function registerRoutes(
             reviewedAt: new Date(),
           }
         );
+
+        if (req.body.status === "approved" || req.body.status === "denied") {
+          await storage.createNotification({
+            organizationId: req.user!.organizationId,
+            userId: existing.userId,
+            type: req.body.status === "approved" ? "time_off_approved" : "time_off_denied",
+            title: `Time-off request ${req.body.status}`,
+            message: `Your time-off request has been ${req.body.status} by your manager.`,
+          });
+        }
+
         return res.json(updated);
       } catch (err: any) {
         return res.status(500).json({ message: err.message });
@@ -336,11 +389,47 @@ export async function registerRoutes(
 
   app.post("/api/messages", authMiddleware, async (req, res) => {
     try {
+      if (!req.body.subject || !req.body.body) {
+        return res.status(400).json({ message: "Please provide a subject and message body." });
+      }
+      if (!req.body.isBroadcast && !req.body.recipientId) {
+        return res.status(400).json({ message: "Please select a recipient or send as a broadcast." });
+      }
       const msg = await storage.createMessage({
-        ...req.body,
         organizationId: req.user!.organizationId,
         senderId: req.user!.id,
+        recipientId: req.body.isBroadcast ? null : req.body.recipientId,
+        subject: req.body.subject,
+        body: req.body.body,
+        isBroadcast: req.body.isBroadcast || false,
       });
+
+      const senderUser = await storage.getUser(req.user!.id);
+      const senderName = senderUser ? `${senderUser.firstName} ${senderUser.lastName}` : "Someone";
+
+      if (req.body.isBroadcast) {
+        const orgUsers = await storage.getUsersByOrg(req.user!.organizationId);
+        for (const u of orgUsers) {
+          if (u.id !== req.user!.id) {
+            await storage.createNotification({
+              organizationId: req.user!.organizationId,
+              userId: u.id,
+              type: "announcement",
+              title: "New broadcast message",
+              message: `${senderName} sent a broadcast: "${req.body.subject}"`,
+            });
+          }
+        }
+      } else if (req.body.recipientId) {
+        await storage.createNotification({
+          organizationId: req.user!.organizationId,
+          userId: req.body.recipientId,
+          type: "announcement",
+          title: "New message",
+          message: `${senderName} sent you a message: "${req.body.subject}"`,
+        });
+      }
+
       return res.json(msg);
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
