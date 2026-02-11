@@ -37,9 +37,12 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<User>): Promise<User>;
   getUsersByOrg(orgId: string): Promise<User[]>;
 
   createLocation(loc: InsertLocation): Promise<Location>;
+  updateLocation(id: string, data: Partial<Location>): Promise<Location>;
+  getLocation(id: string): Promise<Location | undefined>;
   getLocationsByOrg(orgId: string): Promise<Location[]>;
 
   createShift(shift: InsertShift): Promise<Shift>;
@@ -111,6 +114,15 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async updateUser(id: string, data: Partial<User>): Promise<User> {
+    const [result] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+    return result;
+  }
+
   async getUsersByOrg(orgId: string): Promise<User[]> {
     return db
       .select()
@@ -122,6 +134,20 @@ export class DatabaseStorage implements IStorage {
   async createLocation(loc: InsertLocation): Promise<Location> {
     const [result] = await db.insert(locations).values(loc).returning();
     return result;
+  }
+
+  async updateLocation(id: string, data: Partial<Location>): Promise<Location> {
+    const [result] = await db
+      .update(locations)
+      .set(data)
+      .where(eq(locations.id, id))
+      .returning();
+    return result;
+  }
+
+  async getLocation(id: string): Promise<Location | undefined> {
+    const [result] = await db.select().from(locations).where(eq(locations.id, id));
+    return result || undefined;
   }
 
   async getLocationsByOrg(orgId: string): Promise<Location[]> {

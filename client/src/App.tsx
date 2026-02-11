@@ -21,6 +21,7 @@ import MessagesPage from "@/pages/messages";
 import NotificationsPage from "@/pages/notifications";
 import ReportsPage from "@/pages/reports";
 import SwapsPage from "@/pages/swaps";
+import ProfilePage from "@/pages/profile";
 
 function AuthenticatedLayout() {
   const style = {
@@ -48,6 +49,7 @@ function AuthenticatedLayout() {
               <Route path="/notifications" component={NotificationsPage} />
               <Route path="/reports" component={ReportsPage} />
               <Route path="/swaps" component={SwapsPage} />
+              <Route path="/profile" component={ProfilePage} />
               <Route path="/">
                 <Redirect to="/dashboard" />
               </Route>

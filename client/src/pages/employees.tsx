@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ import {
   Phone,
   Briefcase,
   DollarSign,
+  Pencil,
 } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 
@@ -40,6 +42,7 @@ export default function EmployeesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showDialog, setShowDialog] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<UserType | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const isManager = user?.role === "owner" || user?.role === "manager";
 
@@ -69,11 +72,22 @@ export default function EmployeesPage() {
       setShowDialog(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not add employee",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not add employee", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateUser = useMutation({
+    mutationFn: async ({ id, ...data }: any) => {
+      const res = await apiRequest("PATCH", `/api/users/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      toast({ title: "Employee updated" });
+      setShowDialog(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not update employee", description: err.message, variant: "destructive" });
     },
   });
 
@@ -103,21 +117,65 @@ export default function EmployeesPage() {
     });
   };
 
-  const filtered = employees.filter((e) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      e.firstName.toLowerCase().includes(q) ||
-      e.lastName.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q) ||
-      (e.position || "").toLowerCase().includes(q)
-    );
-  });
-
-  const roleColors: Record<string, string> = {
-    owner: "default",
-    manager: "secondary",
-    employee: "secondary",
+  const handleUpdate = () => {
+    if (!editingEmployee) return;
+    if (!formData.firstName || !formData.lastName) {
+      toast({ title: "Please enter first and last name", variant: "destructive" });
+      return;
+    }
+    if (!formData.email) {
+      toast({ title: "Please enter an email address", variant: "destructive" });
+      return;
+    }
+    updateUser.mutate({
+      id: editingEmployee.id,
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      phone: formData.phone || null,
+      role: formData.role,
+      position: formData.position || null,
+      hourlyRate: formData.hourlyRate || null,
+    });
   };
+
+  const openEditDialog = (emp: UserType) => {
+    setEditingEmployee(emp);
+    setFormData({
+      email: emp.email,
+      password: "",
+      firstName: emp.firstName,
+      lastName: emp.lastName,
+      phone: emp.phone || "",
+      role: emp.role,
+      position: emp.position || "",
+      hourlyRate: emp.hourlyRate || "",
+    });
+    setShowDialog(true);
+  };
+
+  const openCreateDialog = () => {
+    setEditingEmployee(null);
+    setFormData({
+      email: "",
+      password: "",
+      firstName: "",
+      lastName: "",
+      phone: "",
+      role: "employee",
+      position: "",
+      hourlyRate: "",
+    });
+    setShowDialog(true);
+  };
+
+  const filtered = employees.filter((e) => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const searchable = `${e.firstName} ${e.lastName} ${e.email} ${e.position || ""} ${e.role} ${e.phone || ""}`.toLowerCase();
+    const words = q.split(/\s+/);
+    return words.every((w) => searchable.includes(w));
+  });
 
   if (isLoading) {
     return (
@@ -136,10 +194,7 @@ export default function EmployeesPage() {
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1
-            className="text-2xl font-bold"
-            data-testid="text-employees-title"
-          >
+          <h1 className="text-2xl font-bold" data-testid="text-employees-title">
             Employees
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -147,22 +202,7 @@ export default function EmployeesPage() {
           </p>
         </div>
         {isManager && (
-          <Button
-            onClick={() => {
-              setFormData({
-                email: "",
-                password: "",
-                firstName: "",
-                lastName: "",
-                phone: "",
-                role: "employee",
-                position: "",
-                hourlyRate: "",
-              });
-              setShowDialog(true);
-            }}
-            data-testid="button-add-employee"
-          >
+          <Button onClick={openCreateDialog} data-testid="button-add-employee">
             <Plus className="w-4 h-4 mr-2" />
             Add Employee
           </Button>
@@ -172,7 +212,7 @@ export default function EmployeesPage() {
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search employees..."
+          placeholder="Search by name, email, role..."
           className="pl-9"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -186,44 +226,28 @@ export default function EmployeesPage() {
             <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <h3 className="font-medium mb-1">No employees found</h3>
             <p className="text-sm text-muted-foreground">
-              {searchQuery
-                ? "Try a different search term."
-                : "Add your first employee to get started."}
+              {searchQuery ? "Try a different search term." : "Add your first employee to get started."}
             </p>
           </div>
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((emp) => (
-            <Card
-              key={emp.id}
-              className="p-5"
-              data-testid={`employee-card-${emp.id}`}
-            >
+            <Card key={emp.id} className="p-5" data-testid={`employee-card-${emp.id}`}>
               <div className="flex items-start gap-4">
                 <Avatar className="w-11 h-11">
                   <AvatarFallback className="text-sm bg-primary/10 text-primary">
-                    {emp.firstName[0]}
-                    {emp.lastName[0]}
+                    {emp.firstName[0]}{emp.lastName[0]}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-sm">
-                      {emp.firstName} {emp.lastName}
-                    </p>
-                    <Badge
-                      variant={
-                        emp.role === "owner" ? "default" : "secondary"
-                      }
-                      className="text-xs capitalize"
-                    >
+                    <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
+                    <Badge variant={emp.role === "owner" ? "default" : "secondary"} className="text-xs capitalize">
                       {emp.role}
                     </Badge>
                     {!emp.isActive && (
-                      <Badge variant="destructive" className="text-xs">
-                        Inactive
-                      </Badge>
+                      <Badge variant="destructive" className="text-xs">Inactive</Badge>
                     )}
                   </div>
                   <div className="mt-2 space-y-1">
@@ -251,6 +275,11 @@ export default function EmployeesPage() {
                     )}
                   </div>
                 </div>
+                {isManager && (
+                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(emp)} data-testid={`button-edit-employee-${emp.id}`}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </Card>
           ))}
@@ -260,69 +289,36 @@ export default function EmployeesPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Employee</DialogTitle>
+            <DialogTitle>{editingEmployee ? "Edit Employee" : "Add Employee"}</DialogTitle>
+            <DialogDescription>
+              {editingEmployee ? `Update details for ${editingEmployee.firstName} ${editingEmployee.lastName}` : "Add a new team member"}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>First Name</Label>
-                <Input
-                  value={formData.firstName}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      firstName: e.target.value,
-                    }))
-                  }
-                  data-testid="input-emp-first-name"
-                />
+                <Input value={formData.firstName} onChange={(e) => setFormData((f) => ({ ...f, firstName: e.target.value }))} data-testid="input-emp-first-name" />
               </div>
               <div className="space-y-2">
                 <Label>Last Name</Label>
-                <Input
-                  value={formData.lastName}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      lastName: e.target.value,
-                    }))
-                  }
-                  data-testid="input-emp-last-name"
-                />
+                <Input value={formData.lastName} onChange={(e) => setFormData((f) => ({ ...f, lastName: e.target.value }))} data-testid="input-emp-last-name" />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, email: e.target.value }))
-                }
-                data-testid="input-emp-email"
-              />
+              <Input type="email" value={formData.email} onChange={(e) => setFormData((f) => ({ ...f, email: e.target.value }))} data-testid="input-emp-email" />
             </div>
-            <div className="space-y-2">
-              <Label>Password</Label>
-              <Input
-                type="password"
-                placeholder="Min 6 characters"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, password: e.target.value }))
-                }
-                data-testid="input-emp-password"
-              />
-            </div>
+            {!editingEmployee && (
+              <div className="space-y-2">
+                <Label>Password</Label>
+                <Input type="password" placeholder="Min 6 characters" value={formData.password} onChange={(e) => setFormData((f) => ({ ...f, password: e.target.value }))} data-testid="input-emp-password" />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(v) =>
-                    setFormData((f) => ({ ...f, role: v }))
-                  }
-                >
+                <Select value={formData.role} onValueChange={(v) => setFormData((f) => ({ ...f, role: v }))}>
                   <SelectTrigger data-testid="select-emp-role">
                     <SelectValue />
                   </SelectTrigger>
@@ -334,68 +330,29 @@ export default function EmployeesPage() {
               </div>
               <div className="space-y-2">
                 <Label>Hourly Rate</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={formData.hourlyRate}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      hourlyRate: e.target.value,
-                    }))
-                  }
-                  data-testid="input-emp-rate"
-                />
+                <Input type="number" step="0.01" placeholder="0.00" value={formData.hourlyRate} onChange={(e) => setFormData((f) => ({ ...f, hourlyRate: e.target.value }))} data-testid="input-emp-rate" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Position</Label>
-                <Input
-                  placeholder="e.g. Server, Cook"
-                  value={formData.position}
-                  onChange={(e) =>
-                    setFormData((f) => ({
-                      ...f,
-                      position: e.target.value,
-                    }))
-                  }
-                  data-testid="input-emp-position"
-                />
+                <Input placeholder="e.g. Server, Cook" value={formData.position} onChange={(e) => setFormData((f) => ({ ...f, position: e.target.value }))} data-testid="input-emp-position" />
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input
-                  placeholder="Optional"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, phone: e.target.value }))
-                  }
-                  data-testid="input-emp-phone"
-                />
+                <Input placeholder="Optional" value={formData.phone} onChange={(e) => setFormData((f) => ({ ...f, phone: e.target.value }))} data-testid="input-emp-phone" />
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
             <Button
-              onClick={handleCreate}
-              disabled={
-                createUser.isPending ||
-                !formData.email ||
-                !formData.firstName ||
-                !formData.lastName ||
-                !formData.password
-              }
+              onClick={editingEmployee ? handleUpdate : handleCreate}
+              disabled={createUser.isPending || updateUser.isPending || !formData.email || !formData.firstName || !formData.lastName || (!editingEmployee && !formData.password)}
               data-testid="button-save-employee"
             >
-              {createUser.isPending && (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              )}
-              Add Employee
+              {(createUser.isPending || updateUser.isPending) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {editingEmployee ? "Save Changes" : "Add Employee"}
             </Button>
           </DialogFooter>
         </DialogContent>

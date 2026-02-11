@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
@@ -6,12 +6,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +32,13 @@ import {
   Plus,
   Calendar as CalIcon,
   Loader2,
-  GripVertical,
-  AlertTriangle,
+  Clock,
+  MapPin,
+  User,
+  Pencil,
+  Trash2,
+  Briefcase,
+  FileText,
 } from "lucide-react";
 import {
   format,
@@ -43,7 +50,9 @@ import {
   isSameDay,
   setHours,
   setMinutes,
+  differenceInMinutes,
 } from "date-fns";
+import { cn } from "@/lib/utils";
 import type { Shift, User as UserType, Location } from "@shared/schema";
 
 interface ShiftFormData {
@@ -56,63 +65,33 @@ interface ShiftFormData {
   status: string;
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const statusConfig: Record<string, { label: string; color: string; variant: "default" | "secondary" | "destructive" }> = {
+  scheduled: { label: "Scheduled", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400", variant: "secondary" },
+  published: { label: "Published", color: "bg-primary/15 text-primary", variant: "default" },
+  completed: { label: "Completed", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", variant: "default" },
+  cancelled: { label: "Cancelled", color: "bg-destructive/15 text-destructive", variant: "destructive" },
+};
 
-function ShiftCard({
-  shift,
-  employees,
-  onClick,
-}: {
-  shift: Shift;
-  employees: UserType[];
-  onClick: () => void;
-}) {
-  const emp = employees.find((e) => e.id === shift.userId);
-  const startH = new Date(shift.startTime).getHours();
-  const startM = new Date(shift.startTime).getMinutes();
-  const endH = new Date(shift.endTime).getHours();
-  const endM = new Date(shift.endTime).getMinutes();
+function formatTime(date: Date | string) {
+  const d = new Date(date);
+  return format(d, "h:mm a");
+}
 
-  const statusColors: Record<string, string> = {
-    scheduled: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
-    published: "bg-primary/15 text-primary",
-    completed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-    cancelled: "bg-destructive/15 text-destructive",
-  };
-
-  return (
-    <div
-      onClick={onClick}
-      className="p-2 rounded-md text-xs cursor-pointer border border-border hover-elevate transition-colors"
-      style={{
-        backgroundColor: `hsl(var(--${shift.status === "published" ? "primary" : "accent"}) / 0.08)`,
-      }}
-      data-testid={`shift-card-${shift.id}`}
-    >
-      <div className="flex items-center gap-1 mb-1">
-        <GripVertical className="w-3 h-3 text-muted-foreground/50" />
-        <span className="font-medium truncate">
-          {emp ? `${emp.firstName} ${emp.lastName[0]}.` : "Unassigned"}
-        </span>
-      </div>
-      <p className="text-muted-foreground">
-        {`${startH}:${startM.toString().padStart(2, "0")} - ${endH}:${endM.toString().padStart(2, "0")}`}
-      </p>
-      {shift.position && (
-        <p className="text-muted-foreground truncate mt-0.5">
-          {shift.position}
-        </p>
-      )}
-    </div>
-  );
+function formatDuration(start: Date | string, end: Date | string) {
+  const mins = differenceInMinutes(new Date(end), new Date(start));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [currentWeek, setCurrentWeek] = useState(new Date());
-  const [showDialog, setShowDialog] = useState(false);
+  const [showFormDialog, setShowFormDialog] = useState(false);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [viewingShift, setViewingShift] = useState<Shift | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [formData, setFormData] = useState<ShiftFormData>({
     userId: "",
@@ -127,6 +106,8 @@ export default function SchedulePage() {
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  const isManager = user?.role === "owner" || user?.role === "manager";
 
   const { data: shifts = [], isLoading: loadingShifts } = useQuery<Shift[]>({
     queryKey: ["/api/shifts"],
@@ -148,14 +129,10 @@ export default function SchedulePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({ title: "Shift created successfully" });
-      setShowDialog(false);
+      setShowFormDialog(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not create shift",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not create shift", description: err.message, variant: "destructive" });
     },
   });
 
@@ -167,14 +144,11 @@ export default function SchedulePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({ title: "Shift updated successfully" });
-      setShowDialog(false);
+      setShowFormDialog(false);
+      setShowDetailDialog(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not update shift",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not update shift", description: err.message, variant: "destructive" });
     },
   });
 
@@ -185,14 +159,11 @@ export default function SchedulePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/shifts"] });
       toast({ title: "Shift deleted" });
-      setShowDialog(false);
+      setShowFormDialog(false);
+      setShowDetailDialog(false);
     },
     onError: (err: Error) => {
-      toast({
-        title: "Could not delete shift",
-        description: err.message,
-        variant: "destructive",
-      });
+      toast({ title: "Could not delete shift", description: err.message, variant: "destructive" });
     },
   });
 
@@ -208,7 +179,7 @@ export default function SchedulePage() {
       notes: "",
       status: "scheduled",
     });
-    setShowDialog(true);
+    setShowFormDialog(true);
   };
 
   const openEditDialog = (shift: Shift) => {
@@ -225,12 +196,17 @@ export default function SchedulePage() {
       notes: shift.notes || "",
       status: shift.status,
     });
-    setShowDialog(true);
+    setShowDetailDialog(false);
+    setShowFormDialog(true);
+  };
+
+  const openDetailDialog = (shift: Shift) => {
+    setViewingShift(shift);
+    setShowDetailDialog(true);
   };
 
   const handleSave = () => {
     if (!selectedDate) return;
-
     if (!formData.locationId) {
       toast({ title: "Please select a location", variant: "destructive" });
       return;
@@ -239,24 +215,14 @@ export default function SchedulePage() {
       toast({ title: "Please set both start and end times", variant: "destructive" });
       return;
     }
-
     const [startH, startM] = formData.startTime.split(":").map(Number);
     const [endH, endM] = formData.endTime.split(":").map(Number);
-
     if (endH < startH || (endH === startH && endM <= startM)) {
       toast({ title: "End time must be after start time", variant: "destructive" });
       return;
     }
-
-    const startTime = setMinutes(
-      setHours(new Date(selectedDate), startH),
-      startM
-    );
-    const endTime = setMinutes(
-      setHours(new Date(selectedDate), endH),
-      endM
-    );
-
+    const startTime = setMinutes(setHours(new Date(selectedDate), startH), startM);
+    const endTime = setMinutes(setHours(new Date(selectedDate), endH), endM);
     const payload = {
       organizationId: user!.organizationId,
       locationId: formData.locationId,
@@ -267,7 +233,6 @@ export default function SchedulePage() {
       notes: formData.notes || null,
       status: formData.status,
     };
-
     if (editingShift) {
       updateShift.mutate({ id: editingShift.id, ...payload });
     } else {
@@ -282,17 +247,15 @@ export default function SchedulePage() {
       map.set(
         key,
         shifts.filter((s) => isSameDay(new Date(s.startTime), day))
-          .sort(
-            (a, b) =>
-              new Date(a.startTime).getTime() -
-              new Date(b.startTime).getTime()
-          )
+          .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
       );
     });
     return map;
   }, [shifts, weekDays]);
 
-  const isManager = user?.role === "owner" || user?.role === "manager";
+  const totalWeekShifts = weekDays.reduce((sum, day) => {
+    return sum + (shiftsByDay.get(format(day, "yyyy-MM-dd"))?.length || 0);
+  }, 0);
 
   if (loadingShifts) {
     return (
@@ -304,7 +267,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-schedule-title">
@@ -312,143 +275,241 @@ export default function SchedulePage() {
           </h1>
           <p className="text-muted-foreground text-sm">
             {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+            <span className="ml-2 text-muted-foreground/60">
+              ({totalWeekShifts} shift{totalWeekShifts !== 1 ? "s" : ""})
+            </span>
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-            data-testid="button-prev-week"
-          >
+          <Button size="icon" variant="outline" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))} data-testid="button-prev-week">
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentWeek(new Date())}
-            data-testid="button-today"
-          >
+          <Button variant="outline" onClick={() => setCurrentWeek(new Date())} data-testid="button-today">
             <CalIcon className="w-4 h-4 mr-2" />
             Today
           </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-            data-testid="button-next-week"
-          >
+          <Button size="icon" variant="outline" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))} data-testid="button-next-week">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
-        {weekDays.map((day) => {
-          const key = format(day, "yyyy-MM-dd");
-          const dayShifts = shiftsByDay.get(key) || [];
-          const isCurrentDay = isSameDay(day, new Date());
+      <div className="overflow-x-auto -mx-4 md:-mx-6 px-4 md:px-6">
+        <div className="grid grid-cols-7 gap-3 min-w-[700px]">
+          {weekDays.map((day) => {
+            const key = format(day, "yyyy-MM-dd");
+            const dayShifts = shiftsByDay.get(key) || [];
+            const isCurrentDay = isSameDay(day, new Date());
 
-          return (
-            <Card
-              key={key}
-              className={`min-h-[200px] p-3 ${isCurrentDay ? "ring-2 ring-primary/30" : ""}`}
-              data-testid={`day-column-${key}`}
-            >
-              <div className="flex items-center justify-between gap-1 mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase">
-                    {format(day, "EEE")}
-                  </p>
-                  <p
-                    className={`text-lg font-bold ${isCurrentDay ? "text-primary" : ""}`}
-                  >
-                    {format(day, "d")}
-                  </p>
+            return (
+              <div key={key} data-testid={`day-column-${key}`} className="space-y-2">
+                <div className={cn(
+                  "flex items-center justify-between gap-1 p-2 rounded-md",
+                  isCurrentDay ? "bg-primary/10" : "bg-accent/50"
+                )}>
+                  <div className="text-center flex-1">
+                    <p className="text-xs text-muted-foreground uppercase font-medium">
+                      {format(day, "EEE")}
+                    </p>
+                    <p className={cn("text-xl font-bold", isCurrentDay && "text-primary")}>
+                      {format(day, "d")}
+                    </p>
+                  </div>
+                  {isManager && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => openCreateDialog(day)}
+                      data-testid={`button-add-shift-${key}`}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-                {isManager && (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="w-7 h-7"
-                    onClick={() => openCreateDialog(day)}
-                    data-testid={`button-add-shift-${key}`}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </Button>
-                )}
+
+                <div className="space-y-2 min-h-[120px]">
+                  {dayShifts.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <p className="text-xs text-muted-foreground/40">No shifts</p>
+                    </div>
+                  ) : (
+                    dayShifts.map((shift) => {
+                      const emp = employees.find((e) => e.id === shift.userId);
+                      const loc = locations.find((l) => l.id === shift.locationId);
+                      const cfg = statusConfig[shift.status] || statusConfig.scheduled;
+
+                      return (
+                        <Card
+                          key={shift.id}
+                          className={cn(
+                            "p-3 cursor-pointer hover-elevate transition-all",
+                            isCurrentDay && "border-primary/20"
+                          )}
+                          onClick={() => openDetailDialog(shift)}
+                          data-testid={`shift-card-${shift.id}`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="w-6 h-6 flex-shrink-0">
+                                <AvatarFallback className="text-[10px]">
+                                  {emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "?"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium truncate">
+                                {emp ? `${emp.firstName} ${emp.lastName}` : "Unassigned"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Clock className="w-3 h-3 flex-shrink-0" />
+                              <span>{formatTime(shift.startTime)} - {formatTime(shift.endTime)}</span>
+                            </div>
+                            {shift.position && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Briefcase className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{shift.position}</span>
+                              </div>
+                            )}
+                            {loc && (
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <MapPin className="w-3 h-3 flex-shrink-0" />
+                                <span className="truncate">{loc.name}</span>
+                              </div>
+                            )}
+                            <Badge variant={cfg.variant} className="text-[10px]">
+                              {cfg.label}
+                            </Badge>
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-              <div className="space-y-1.5">
-                {dayShifts.map((shift) => (
-                  <ShiftCard
-                    key={shift.id}
-                    shift={shift}
-                    employees={employees}
-                    onClick={() => isManager && openEditDialog(shift)}
-                  />
-                ))}
-                {dayShifts.length === 0 && (
-                  <p className="text-xs text-muted-foreground/50 text-center py-4">
-                    No shifts
-                  </p>
-                )}
-              </div>
-            </Card>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingShift ? "Edit Shift" : "Create Shift"}
-            </DialogTitle>
+            <DialogTitle>Shift Details</DialogTitle>
+            <DialogDescription>
+              {viewingShift && format(new Date(viewingShift.startTime), "EEEE, MMMM d, yyyy")}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingShift && (() => {
+            const emp = employees.find((e) => e.id === viewingShift.userId);
+            const loc = locations.find((l) => l.id === viewingShift.locationId);
+            const cfg = statusConfig[viewingShift.status] || statusConfig.scheduled;
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 rounded-md bg-accent/50">
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback>
+                      {emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{emp ? `${emp.firstName} ${emp.lastName}` : "Unassigned"}</p>
+                    {emp?.position && <p className="text-xs text-muted-foreground">{emp.position}</p>}
+                  </div>
+                  <div className="ml-auto">
+                    <Badge variant={cfg.variant}>{cfg.label}</Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock className="w-3 h-3" /> Time</p>
+                    <p className="text-sm font-medium">{formatTime(viewingShift.startTime)} - {formatTime(viewingShift.endTime)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDuration(viewingShift.startTime, viewingShift.endTime)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><MapPin className="w-3 h-3" /> Location</p>
+                    <p className="text-sm font-medium">{loc?.name || "Unknown"}</p>
+                    {loc?.address && <p className="text-xs text-muted-foreground">{loc.address}</p>}
+                  </div>
+                </div>
+                {viewingShift.position && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase className="w-3 h-3" /> Position</p>
+                    <p className="text-sm font-medium">{viewingShift.position}</p>
+                  </div>
+                )}
+                {viewingShift.notes && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><FileText className="w-3 h-3" /> Notes</p>
+                    <p className="text-sm">{viewingShift.notes}</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <DialogFooter className="gap-2 flex-wrap">
+            {isManager && viewingShift && (
+              <>
+                <Button
+                  variant="destructive"
+                  onClick={() => deleteShift.mutate(viewingShift.id)}
+                  disabled={deleteShift.isPending}
+                  data-testid="button-delete-shift-detail"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </Button>
+                <div className="flex-1" />
+                <Button
+                  variant="outline"
+                  onClick={() => openEditDialog(viewingShift)}
+                  data-testid="button-edit-shift-detail"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit
+                </Button>
+              </>
+            )}
+            {!isManager && <div className="flex-1" />}
+            <Button variant="outline" onClick={() => setShowDetailDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showFormDialog} onOpenChange={setShowFormDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingShift ? "Edit Shift" : "Create Shift"}</DialogTitle>
+            <DialogDescription>
+              {selectedDate && format(selectedDate, "EEEE, MMMM d, yyyy")}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {selectedDate && (
-              <p className="text-sm text-muted-foreground">
-                {format(selectedDate, "EEEE, MMMM d, yyyy")}
-              </p>
-            )}
             <div className="space-y-2">
               <Label>Employee</Label>
-              <Select
-                value={formData.userId}
-                onValueChange={(v) =>
-                  setFormData((f) => ({ ...f, userId: v }))
-                }
-              >
+              <Select value={formData.userId} onValueChange={(v) => setFormData((f) => ({ ...f, userId: v }))}>
                 <SelectTrigger data-testid="select-employee">
                   <SelectValue placeholder="Select employee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {employees
-                    .filter((e) => e.isActive)
-                    .map((e) => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.firstName} {e.lastName}
-                      </SelectItem>
-                    ))}
+                  {employees.filter((e) => e.isActive).map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.firstName} {e.lastName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Location</Label>
-              <Select
-                value={formData.locationId}
-                onValueChange={(v) =>
-                  setFormData((f) => ({ ...f, locationId: v }))
-                }
-              >
+              <Select value={formData.locationId} onValueChange={(v) => setFormData((f) => ({ ...f, locationId: v }))}>
                 <SelectTrigger data-testid="select-location">
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -456,97 +517,50 @@ export default function SchedulePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Start Time</Label>
-                <Input
-                  type="time"
-                  value={formData.startTime}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, startTime: e.target.value }))
-                  }
-                  data-testid="input-start-time"
-                />
+                <Input type="time" value={formData.startTime} onChange={(e) => setFormData((f) => ({ ...f, startTime: e.target.value }))} data-testid="input-start-time" />
               </div>
               <div className="space-y-2">
                 <Label>End Time</Label>
-                <Input
-                  type="time"
-                  value={formData.endTime}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, endTime: e.target.value }))
-                  }
-                  data-testid="input-end-time"
-                />
+                <Input type="time" value={formData.endTime} onChange={(e) => setFormData((f) => ({ ...f, endTime: e.target.value }))} data-testid="input-end-time" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Position</Label>
+                <Input placeholder="e.g. Front Desk" value={formData.position} onChange={(e) => setFormData((f) => ({ ...f, position: e.target.value }))} data-testid="input-position" />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={formData.status} onValueChange={(v) => setFormData((f) => ({ ...f, status: v }))}>
+                  <SelectTrigger data-testid="select-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Position</Label>
-              <Input
-                placeholder="e.g. Front Desk, Kitchen"
-                value={formData.position}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, position: e.target.value }))
-                }
-                data-testid="input-position"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v) =>
-                  setFormData((f) => ({ ...f, status: v }))
-                }
-              >
-                <SelectTrigger data-testid="select-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea
-                placeholder="Optional notes..."
-                value={formData.notes}
-                onChange={(e) =>
-                  setFormData((f) => ({ ...f, notes: e.target.value }))
-                }
-                className="resize-none"
-                data-testid="input-notes"
-              />
+              <Textarea placeholder="Optional notes..." value={formData.notes} onChange={(e) => setFormData((f) => ({ ...f, notes: e.target.value }))} className="resize-none" data-testid="input-notes" />
             </div>
           </div>
           <DialogFooter className="gap-2 flex-wrap">
             {editingShift && (
-              <Button
-                variant="destructive"
-                onClick={() => deleteShift.mutate(editingShift.id)}
-                disabled={deleteShift.isPending}
-                data-testid="button-delete-shift"
-              >
+              <Button variant="destructive" onClick={() => deleteShift.mutate(editingShift.id)} disabled={deleteShift.isPending} data-testid="button-delete-shift">
                 Delete
               </Button>
             )}
             <div className="flex-1" />
-            <Button
-              variant="outline"
-              onClick={() => setShowDialog(false)}
-              data-testid="button-cancel"
-            >
+            <Button variant="outline" onClick={() => setShowFormDialog(false)} data-testid="button-cancel">
               Cancel
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={createShift.isPending || updateShift.isPending}
-              data-testid="button-save-shift"
-            >
-              {(createShift.isPending || updateShift.isPending) && (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              )}
+            <Button onClick={handleSave} disabled={createShift.isPending || updateShift.isPending} data-testid="button-save-shift">
+              {(createShift.isPending || updateShift.isPending) && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {editingShift ? "Update" : "Create"}
             </Button>
           </DialogFooter>

@@ -6,6 +6,18 @@ Cloud-agnostic, self-hostable employee shift scheduling platform. Multi-tenant a
 ## Current State
 MVP complete with all core features: authentication, schedule management, time-off, messaging, shift swaps, notifications, and reporting. Enhanced with shadcn Calendar date pickers, threaded messaging with conversation view, unread badges in sidebar, comprehensive client-side validation, and user-friendly error messages throughout.
 
+### Recent Changes
+- Schedule page: weekly calendar layout with shift detail popup dialog, shift cards with avatars and status badges
+- Full CRUD: employees and locations have edit dialogs with PATCH endpoints
+- Profile page: /profile with password change and personal details editing
+- User update API: PATCH /api/users/:id with role-based permissions
+- Password change: POST /api/auth/change-password with current password verification
+- Employee search: case-insensitive multi-word fuzzy matching across name, email, role, position
+- Message search: case-insensitive searching across subject, body, and sender name
+- Reports: includes scheduled+published+completed shifts in hour calculations
+- Role-based data access: employees only see their own time-off requests and swap requests
+- Auth context: refetchUser added for profile updates
+
 ## Architecture
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
 - **Backend**: Express.js + TypeScript

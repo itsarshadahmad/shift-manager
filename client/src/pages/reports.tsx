@@ -59,7 +59,7 @@ export default function ReportsPage() {
       const empShifts = shifts.filter(
         (s) =>
           s.userId === emp.id &&
-          (s.status === "completed" || s.status === "published")
+          (s.status === "completed" || s.status === "published" || s.status === "scheduled")
       );
       const totalHours = empShifts.reduce((acc, s) => {
         return (
@@ -71,6 +71,7 @@ export default function ReportsPage() {
         ? totalHours * parseFloat(emp.hourlyRate)
         : 0;
       return {
+        id: emp.id,
         name: `${emp.firstName} ${emp.lastName[0]}.`,
         hours: totalHours,
         cost: laborCost,
@@ -292,7 +293,7 @@ export default function ReportsPage() {
               <tbody>
                 {hoursPerEmployee.map((emp) => (
                   <tr
-                    key={emp.name}
+                    key={emp.id}
                     className="border-b border-border last:border-0"
                   >
                     <td className="py-2">{emp.name}</td>

@@ -55,9 +55,9 @@ const typeLabels: Record<string, string> = {
 export default function TimeOffPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [showDialog, setShowDialog] = useState(false);
-  const [tab, setTab] = useState("all");
   const isManager = user?.role === "owner" || user?.role === "manager";
+  const [showDialog, setShowDialog] = useState(false);
+  const [tab, setTab] = useState(isManager ? "all" : "mine");
 
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
@@ -189,15 +189,19 @@ export default function TimeOffPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all">
-            All
-          </TabsTrigger>
+          {isManager && (
+            <TabsTrigger value="all" data-testid="tab-all">
+              All
+            </TabsTrigger>
+          )}
           <TabsTrigger value="mine" data-testid="tab-mine">
             My Requests
           </TabsTrigger>
-          <TabsTrigger value="pending" data-testid="tab-pending">
-            Pending
-          </TabsTrigger>
+          {isManager && (
+            <TabsTrigger value="pending" data-testid="tab-pending">
+              Pending
+            </TabsTrigger>
+          )}
           <TabsTrigger value="approved" data-testid="tab-approved">
             Approved
           </TabsTrigger>

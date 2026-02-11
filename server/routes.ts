@@ -154,6 +154,79 @@ export async function registerRoutes(
     }
   );
 
+  // ── Update User (manager/owner can update any, employee can update self) ──
+  app.patch("/api/users/:id", authMiddleware, async (req, res) => {
+    try {
+      const targetId = req.params.id;
+      const isManagerRole = req.user!.role === "owner" || req.user!.role === "manager";
+      const isSelf = targetId === req.user!.id;
+
+      if (!isManagerRole && !isSelf) {
+        return res.status(403).json({ message: "You can only update your own profile" });
+      }
+
+      const target = await storage.getUser(targetId);
+      if (!target || target.organizationId !== req.user!.organizationId) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updateData: any = {};
+      if (req.body.firstName !== undefined) updateData.firstName = req.body.firstName;
+      if (req.body.lastName !== undefined) updateData.lastName = req.body.lastName;
+      if (req.body.phone !== undefined) updateData.phone = req.body.phone;
+      if (req.body.position !== undefined) updateData.position = req.body.position;
+
+      if (isManagerRole) {
+        if (req.body.role !== undefined) updateData.role = req.body.role;
+        if (req.body.hourlyRate !== undefined) updateData.hourlyRate = req.body.hourlyRate;
+        if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive;
+      }
+
+      if (req.body.email !== undefined) {
+        const existing = await storage.getUserByEmail(req.body.email);
+        if (existing && existing.id !== targetId) {
+          return res.status(400).json({ message: "Email already in use" });
+        }
+        updateData.email = req.body.email;
+      }
+
+      const updated = await storage.updateUser(targetId, updateData);
+      const { password: _, ...safeUser } = updated;
+      return res.json(safeUser);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Change Password ──
+  app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Please provide both current and new passwords" });
+      }
+      if (newPassword.length < 6) {
+        return res.status(400).json({ message: "New password must be at least 6 characters" });
+      }
+
+      const user = await storage.getUser(req.user!.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const valid = await comparePassword(currentPassword, user.password);
+      if (!valid) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      const hashedPassword = await hashPassword(newPassword);
+      await storage.updateUser(req.user!.id, { password: hashedPassword });
+      return res.json({ message: "Password changed successfully" });
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Locations Routes ──
   app.get("/api/locations", authMiddleware, async (req, res) => {
     const locs = await storage.getLocationsByOrg(req.user!.organizationId);
@@ -171,6 +244,29 @@ export async function registerRoutes(
           organizationId: req.user!.organizationId,
         });
         return res.json(loc);
+      } catch (err: any) {
+        return res.status(500).json({ message: err.message });
+      }
+    }
+  );
+
+  app.patch(
+    "/api/locations/:id",
+    authMiddleware,
+    requireRole("owner", "manager"),
+    async (req, res) => {
+      try {
+        const loc = await storage.getLocation(req.params.id);
+        if (!loc || loc.organizationId !== req.user!.organizationId) {
+          return res.status(404).json({ message: "Location not found" });
+        }
+        const updateData: any = {};
+        if (req.body.name !== undefined) updateData.name = req.body.name;
+        if (req.body.address !== undefined) updateData.address = req.body.address;
+        if (req.body.timezone !== undefined) updateData.timezone = req.body.timezone;
+        if (req.body.isActive !== undefined) updateData.isActive = req.body.isActive;
+        const updated = await storage.updateLocation(req.params.id, updateData);
+        return res.json(updated);
       } catch (err: any) {
         return res.status(500).json({ message: err.message });
       }
@@ -279,7 +375,11 @@ export async function registerRoutes(
     const requests = await storage.getTimeOffRequestsByOrg(
       req.user!.organizationId
     );
-    return res.json(requests);
+    const isManagerRole = req.user!.role === "owner" || req.user!.role === "manager";
+    if (isManagerRole) {
+      return res.json(requests);
+    }
+    return res.json(requests.filter((r) => r.userId === req.user!.id));
   });
 
   app.post("/api/time-off", authMiddleware, async (req, res) => {
@@ -453,7 +553,11 @@ export async function registerRoutes(
     const swaps = await storage.getShiftSwapRequestsByOrg(
       req.user!.organizationId
     );
-    return res.json(swaps);
+    const isManagerRole = req.user!.role === "owner" || req.user!.role === "manager";
+    if (isManagerRole) {
+      return res.json(swaps);
+    }
+    return res.json(swaps.filter((s) => s.requesterId === req.user!.id || s.targetUserId === req.user!.id));
   });
 
   app.post("/api/swaps", authMiddleware, async (req, res) => {

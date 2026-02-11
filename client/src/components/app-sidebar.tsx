@@ -121,19 +121,21 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         <div className="flex items-center gap-3">
-          <Avatar className="w-9 h-9">
-            <AvatarFallback className="text-xs bg-muted">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {user?.email}
-            </p>
-          </div>
+          <Link href="/profile" className="flex items-center gap-3 flex-1 min-w-0">
+            <Avatar className="w-9 h-9">
+              <AvatarFallback className="text-xs bg-muted">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {user?.email}
+              </p>
+            </div>
+          </Link>
           <Button
             size="icon"
             variant="ghost"

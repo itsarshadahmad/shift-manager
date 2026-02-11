@@ -113,15 +113,20 @@ export default function MessagesPage() {
 
   const filteredThreads = searchQuery
     ? threads.filter((t) => {
+        const q = searchQuery.toLowerCase().trim();
+        if (!q) return true;
+        const words = q.split(/\s+/);
         const name = t.isBroadcast
-          ? "Broadcast"
+          ? "broadcast team"
           : t.partner
             ? `${t.partner.firstName} ${t.partner.lastName}`
             : "";
-        return (
-          name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.lastMessage.subject.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const allText = t.messages
+          .map((m) => `${m.subject} ${m.body}`)
+          .join(" ")
+          .toLowerCase();
+        const searchable = `${name.toLowerCase()} ${allText}`;
+        return words.every((w) => searchable.includes(w));
       })
     : threads;
 
