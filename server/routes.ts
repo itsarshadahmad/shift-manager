@@ -610,11 +610,11 @@ export async function registerRoutes(
     }
   );
 
-  // ── Reports (Owner Only) ──
+  // ── Reports (Owner & Manager) ──
   app.get(
     "/api/reports",
     authMiddleware,
-    requireRole("owner"),
+    requireRole("owner", "manager"),
     async (req, res) => {
       try {
         const shifts = await storage.getShiftsByOrg(req.user!.organizationId);

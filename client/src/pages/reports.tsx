@@ -46,20 +46,20 @@ export default function ReportsPage() {
     timeOff: TimeOffRequest[];
   }>({
     queryKey: ["/api/reports"],
-    enabled: user?.role === "owner",
+    enabled: user?.role === "owner" || user?.role === "manager",
   });
 
   const shifts = reportData?.shifts ?? [];
   const employees = reportData?.users ?? [];
   const timeOffRequests = reportData?.timeOff ?? [];
 
-  if (user?.role !== "owner") {
+  if (user?.role !== "owner" && user?.role !== "manager") {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-center" data-testid="reports-access-denied">
         <ShieldAlert className="w-12 h-12 text-muted-foreground/40 mb-4" />
         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Reports are only available to administrators.
+          Reports are only available to administrators and managers.
         </p>
       </div>
     );

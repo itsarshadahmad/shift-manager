@@ -151,33 +151,35 @@ export default function LocationsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {locations.map((loc) => (
             <Card key={loc.id} className="p-5" data-testid={`location-card-${loc.id}`}>
-              <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Building2 className="w-5 h-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-sm">{loc.name}</h3>
-                    <Badge variant={loc.isActive ? "default" : "secondary"} className="text-xs">
-                      {loc.isActive ? "Active" : "Inactive"}
-                    </Badge>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <Building2 className="w-5 h-5 text-primary" />
                   </div>
-                  {loc.address && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      <span>{loc.address}</span>
-                    </div>
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-sm truncate">{loc.name}</h3>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge variant={loc.isActive ? "default" : "secondary"} className="text-xs">
+                    {loc.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {isManager && (
+                    <Button size="icon" variant="ghost" onClick={() => openEditDialog(loc)} data-testid={`button-edit-location-${loc.id}`}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                    <Globe className="w-3 h-3 flex-shrink-0" />
-                    <span>{loc.timezone}</span>
-                  </div>
                 </div>
-                {isManager && (
-                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(loc)} data-testid={`button-edit-location-${loc.id}`}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                )}
+              </div>
+              {loc.address && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <MapPin className="w-3 h-3 flex-shrink-0" />
+                  <span>{loc.address}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                <Globe className="w-3 h-3 flex-shrink-0" />
+                <span>{loc.timezone}</span>
               </div>
             </Card>
           ))}

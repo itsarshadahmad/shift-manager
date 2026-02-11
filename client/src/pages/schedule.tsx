@@ -140,7 +140,9 @@ function TimePicker({
   label: string;
   testIdPrefix: string;
 }) {
+  const [open, setOpen] = useState(false);
   const parsed = parse24hTo12h(value);
+  const displayTime = `${parsed.hour}:${parsed.minute} ${parsed.period}`;
 
   const handleChange = (field: "hour" | "minute" | "period", val: string) => {
     const current = parse24hTo12h(value);
@@ -148,45 +150,109 @@ function TimePicker({
     onChange(to24h(next.hour, next.minute, next.period));
   };
 
+  const presetTimes = [
+    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00",
+  ];
+
+  const formatPreset = (t: string) => {
+    const p = parse24hTo12h(t);
+    return `${p.hour}:${p.minute} ${p.period}`;
+  };
+
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <div className="flex items-center gap-1.5">
-        <Select value={parsed.hour} onValueChange={(v) => handleChange("hour", v)}>
-          <SelectTrigger data-testid={`${testIdPrefix}-hour`} className="flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-              <SelectItem key={h} value={String(h)}>
-                {h}
-              </SelectItem>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-full justify-start font-normal"
+            data-testid={`${testIdPrefix}-trigger`}
+          >
+            <Clock className="mr-2 w-4 h-4 text-muted-foreground" />
+            {displayTime}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[280px] p-0" align="start">
+          <div className="p-3 border-b border-border">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">{displayTime}</span>
+              <Button variant="ghost" size="sm" onClick={() => setOpen(false)} data-testid={`${testIdPrefix}-done`}>
+                Done
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">Hour</p>
+            <div className="grid grid-cols-4 gap-1">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                <Button
+                  key={h}
+                  type="button"
+                  size="sm"
+                  variant={parsed.hour === String(h) ? "default" : "ghost"}
+                  onClick={() => handleChange("hour", String(h))}
+                  data-testid={`${testIdPrefix}-hour-${h}`}
+                >
+                  {h}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-3 mb-2">Minute</p>
+            <div className="flex items-center gap-1">
+              <div className="flex-1 grid grid-cols-4 gap-1">
+                {["00", "15", "30", "45"].map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="sm"
+                    variant={parsed.minute === m ? "default" : "ghost"}
+                    onClick={() => handleChange("minute", m)}
+                    data-testid={`${testIdPrefix}-min-${m}`}
+                  >
+                    :{m}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex flex-col gap-1 ml-1">
+                {["AM", "PM"].map((p) => (
+                  <Button
+                    key={p}
+                    type="button"
+                    size="sm"
+                    variant={parsed.period === p ? "default" : "ghost"}
+                    onClick={() => handleChange("period", p)}
+                    data-testid={`${testIdPrefix}-${p.toLowerCase()}`}
+                  >
+                    {p}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="px-3 pt-2 pb-1">
+            <p className="text-xs text-muted-foreground">Quick Select</p>
+          </div>
+          <div className="px-2 pb-2 max-h-[180px] overflow-y-auto grid grid-cols-3 gap-1">
+            {presetTimes.map((t) => (
+              <Button
+                key={t}
+                type="button"
+                size="sm"
+                variant={value === t ? "default" : "ghost"}
+                className={cn(value !== t && "text-muted-foreground")}
+                onClick={() => {
+                  onChange(t);
+                  setOpen(false);
+                }}
+                data-testid={`${testIdPrefix}-preset-${t.replace(":", "")}`}
+              >
+                {formatPreset(t)}
+              </Button>
             ))}
-          </SelectContent>
-        </Select>
-        <span className="text-muted-foreground font-medium">:</span>
-        <Select value={parsed.minute} onValueChange={(v) => handleChange("minute", v)}>
-          <SelectTrigger data-testid={`${testIdPrefix}-minute`} className="flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {["00", "15", "30", "45"].map((m) => (
-              <SelectItem key={m} value={m}>
-                {m}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={parsed.period} onValueChange={(v) => handleChange("period", v)}>
-          <SelectTrigger data-testid={`${testIdPrefix}-period`} className="flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="AM">AM</SelectItem>
-            <SelectItem value="PM">PM</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

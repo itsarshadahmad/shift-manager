@@ -46,7 +46,7 @@ const navItems = [
   { title: "Locations", url: "/locations", icon: MapPin, managerOnly: true },
   { title: "Messages", url: "/messages", icon: MessageSquare, badgeKey: "messages" as const },
   { title: "Notifications", url: "/notifications", icon: Bell, badgeKey: "notifications" as const },
-  { title: "Reports", url: "/reports", icon: BarChart3, ownerOnly: true },
+  { title: "Reports", url: "/reports", icon: BarChart3, managerOnly: true },
 ];
 
 export function AppSidebar() {

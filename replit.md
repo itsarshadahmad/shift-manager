@@ -12,7 +12,7 @@ MVP complete with all core features: authentication, schedule management, time-o
 - Role badges: Distinct colors for Admin (violet), Manager (sky), Employee (emerald) via exported roleConfig
 - Schedule page: Responsive layout (desktop 7-col grid, tablet scroll, mobile single-day), searchable employee combobox (Popover+Command), custom 12h time picker, colored status badges
 - Dashboard: Role-aware content - admin/manager stats vs employee personal analytics (My Shifts, Hours, Next Shift)
-- Reports: Owner-only access with server-side /api/reports endpoint using requireRole("owner") + client-side guard
+- Reports: Owner+Manager access with server-side /api/reports endpoint using requireRole("owner", "manager") + client-side guard
 - Time-off: Controlled Popover for date picker auto-close, colored status badges (amber/emerald/red)
 - Login: Indigo-violet gradient on left panel
 - Red destructive logout button in sidebar
