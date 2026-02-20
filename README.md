@@ -40,14 +40,13 @@ npm install
 
 ### 2. Configure Environment
 
-Create a `.env` file in the project root:
+Copy the example env file and edit values:
 
-```env
-DATABASE_URL=postgresql://username:password@localhost:5432/shiftflow
-SESSION_SECRET=your-strong-random-secret-key-here
-PORT=5000
-NODE_ENV=development
+```bash
+cp .env.example .env
 ```
+
+Then update `.env` with your local values.
 
 See [CONFIGURATION.md](./CONFIGURATION.md) for all environment variables.
 
@@ -66,6 +65,19 @@ npm run dev
 ```
 
 The app will be available at `http://localhost:5000`.
+
+
+### Windows Notes
+
+If `cp` is unavailable in your terminal, use one of these:
+
+```powershell
+copy .env.example .env
+```
+
+```cmd
+copy .env.example .env
+```
 
 ### 5. Default Login
 

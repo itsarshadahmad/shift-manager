@@ -2,6 +2,12 @@
 
 ShiftFlow is designed to be cloud-agnostic and can be deployed on any platform that supports Node.js and PostgreSQL.
 
+## Environment Loading
+
+- Local development: the app reads `.env` automatically.
+- Cloud hosting: set environment variables in your provider dashboard/CLI (do not commit `.env`).
+- Required: `DATABASE_URL` and `SESSION_SECRET`.
+
 ## Build for Production
 
 ```bash

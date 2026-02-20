@@ -76,3 +76,13 @@ The server binds to a single port that serves both the API and the frontend:
 - **Production**: Static files are served from the `dist/public` directory
 
 If running behind a reverse proxy (Nginx, Apache, etc.), configure the proxy to forward to the configured port.
+
+
+## Local Setup Checklist
+
+1. Copy `.env.example` to `.env`.
+2. Set `DATABASE_URL` to your local or cloud Postgres URL.
+3. Run `npm run db:push`.
+4. Run `npm run dev`.
+
+If you see `DATABASE_URL must be set`, your `.env` file is missing, is in the wrong folder, or does not include `DATABASE_URL`.
