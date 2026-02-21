@@ -40,14 +40,13 @@ npm install
 
 ### 2. Configure Environment
 
-Create a `.env` file in the project root:
+Copy the example env file and edit values:
 
-```env
-DATABASE_URL=postgresql://username:password@localhost:5432/shiftflow
-SESSION_SECRET=your-strong-random-secret-key-here
-PORT=5000
-NODE_ENV=development
+```bash
+cp .env.example .env
 ```
+
+Then update `.env` with your local values.
 
 See [CONFIGURATION.md](./CONFIGURATION.md) for all environment variables.
 
@@ -67,6 +66,19 @@ npm run dev
 
 The app will be available at `http://localhost:5000`.
 
+
+### Windows Notes
+
+If `cp` is unavailable in your terminal, use one of these:
+
+```powershell
+copy .env.example .env
+```
+
+```cmd
+copy .env.example .env
+```
+
 ### 5. Default Login
 
 On first run, the database is seeded with sample data:
@@ -76,6 +88,23 @@ On first run, the database is seeded with sample data:
 | admin@sunrisecafe.com | password123 | Owner |
 | manager@sunrisecafe.com | password123 | Manager |
 | maria@sunrisecafe.com | password123 | Employee |
+
+
+## Docker Quick Start
+
+This repository includes a production-ready multi-stage `Dockerfile` and a `docker-compose.yml` stack (app + PostgreSQL).
+
+```bash
+docker compose up --build -d
+```
+
+Initialize schema:
+
+```bash
+docker compose exec app npm run db:push
+```
+
+Open: `http://localhost:5000`
 
 ## Production Build
 
