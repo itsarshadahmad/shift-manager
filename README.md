@@ -89,6 +89,23 @@ On first run, the database is seeded with sample data:
 | manager@sunrisecafe.com | password123 | Manager |
 | maria@sunrisecafe.com | password123 | Employee |
 
+
+## Docker Quick Start
+
+This repository includes a production-ready multi-stage `Dockerfile` and a `docker-compose.yml` stack (app + PostgreSQL).
+
+```bash
+docker compose up --build -d
+```
+
+Initialize schema:
+
+```bash
+docker compose exec app npm run db:push
+```
+
+Open: `http://localhost:5000`
+
 ## Production Build
 
 ```bash

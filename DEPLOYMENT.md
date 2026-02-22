@@ -186,72 +186,30 @@ NODE_ENV=production node dist/index.cjs
 
 ### Option 4: Docker (Any Platform)
 
-Create a `Dockerfile`:
+This repo already includes a hardened multi-stage `Dockerfile` and `docker-compose.yml`.
 
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
+Build and run:
 
-FROM node:20-alpine AS runner
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --production
-COPY --from=builder /app/dist ./dist
-EXPOSE 5000
-ENV NODE_ENV=production
-CMD ["node", "dist/index.cjs"]
-```
-
-Create a `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/shiftflow
-      - SESSION_SECRET=change-this-to-a-long-random-string
-      - NODE_ENV=production
-    depends_on:
-      db:
-        condition: service_healthy
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: shiftflow
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  pgdata:
-```
-
-Run with:
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
-Initialize the database:
+Initialize the database schema:
+
 ```bash
-docker compose exec app npx drizzle-kit push
+docker compose exec app npm run db:push
+```
+
+View logs:
+
+```bash
+docker compose logs -f app
+```
+
+Stop:
+
+```bash
+docker compose down
 ```
 
 ### Option 5: Railway / Render / Fly.io
