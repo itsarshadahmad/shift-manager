@@ -92,19 +92,47 @@ On first run, the database is seeded with sample data:
 
 ## Docker Quick Start
 
-This repository includes a production-ready multi-stage `Dockerfile` and a `docker-compose.yml` stack (app + PostgreSQL).
+This repository includes a production-ready multi-stage `Dockerfile` and a `docker-compose.yml` stack (app + PostgreSQL + optional migration helper).
+
+### 1) Create Docker env file
+
+```bash
+cp .env.docker.example .env.docker
+```
+
+Set at least:
+- `SESSION_SECRET` to a long random value (32+ chars)
+- `POSTGRES_PASSWORD` to a non-default password
+- `DATABASE_URL` if you change DB credentials/host
+
+### 2) Build and start containers
 
 ```bash
 docker compose up --build -d
 ```
 
-Initialize schema:
+### 3) Initialize/update database schema
 
 ```bash
-docker compose exec app npm run db:push
+docker compose run --rm migrate
 ```
 
-Open: `http://localhost:5000`
+### 4) Open the app
+
+`http://localhost:5000` (or your configured `APP_PORT`)
+
+### Common commands
+
+```bash
+# View logs
+docker compose logs -f app db
+
+# Stop stack
+docker compose down
+
+# Stop and remove DB data volume
+docker compose down -v
+```
 
 ## Production Build
 

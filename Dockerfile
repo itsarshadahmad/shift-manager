@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-alpine AS base
+ARG NODE_VERSION=20-alpine
+
+FROM node:${NODE_VERSION} AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -11,11 +13,15 @@ FROM deps AS build
 COPY . .
 RUN npm run build
 
+# Tools stage (includes devDependencies) for one-off commands like db:push.
+FROM deps AS tools
+COPY . .
+
 FROM base AS prod-deps
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-FROM node:20-alpine AS runner
+FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
