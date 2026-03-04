@@ -2,6 +2,8 @@
 
 A cloud-agnostic, self-hostable employee shift scheduling platform with time-off management, team communication, and reporting.
 
+### [Screenshots](./SCREENSHOTS.md)
+
 ## Features
 
 - **Schedule Management** - Drag-and-drop weekly schedule builder with conflict detection
